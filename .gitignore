@@ -17,3 +17,6 @@ build/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# 원본 공공데이터(재다운로드 가능, 용량 큼)
+tools/.hospitals_raw.csv
