@@ -2,7 +2,7 @@ import * as db from './db.js';
 import { h, uid, compressImage, formatTime, ymd, parseYmd, isLeap, formatClock, WEEKDAYS } from './util.js';
 import { downloadBackup, parseBackup } from './backup.js';
 import { renderMapTab, destroyMap } from './map.js';
-import { renderCareTab } from './care.js';
+import { renderCareTab, destroyCare, grantPostCoins } from './care.js';
 import { iconEl as ic } from './icons.js';
 import { getSettings, setSettings, STYLES, MODES, ACCENTS } from './theme.js';
 
@@ -355,9 +355,10 @@ function openCompose(post) {
         api.close();
         if (state.filter !== 'all') state.filter = petId;
         state.shown = Math.max(state.shown, PAGE_SIZE);
+        const coins = editing ? 0 : await grantPostCoins(state, petId);
         await reload();
         window.scrollTo(0, 0);
-        toast(editing ? '수정했어요' : '추억을 남겼어요');
+        toast(editing ? '수정했어요' : coins ? `추억을 남겼어요 · 코인 +${coins}` : '추억을 남겼어요');
       } catch (err) {
         toast(friendlyError(err));
         refresh();
@@ -713,12 +714,13 @@ function renderMore() {
 }
 
 /* ---------- 전체 그리기 ---------- */
-const careCtx = { state, toast, openSheet, avatar, render: () => render(), reload: () => reload() };
+const careCtx = { state, toast, openSheet, confirmBox, avatar, render: () => render(), reload: () => reload() };
 
 function render() {
   urls.forEach(u => URL.revokeObjectURL(u));
   urls = [];
   destroyMap();
+  destroyCare();
   const root = $('#app');
   root.replaceChildren();
   if (!state.pets.length) { root.append(renderOnboarding()); return; }
