@@ -1,20 +1,24 @@
 // IndexedDB 저장소: 모든 기록은 사용자 폰(브라우저) 안에만 저장된다.
 const DB_NAME = 'pet-memories';
-const DB_VERSION = 1;
-export const STORES = ['pets', 'posts', 'meta'];
+const DB_VERSION = 2;
+export const STORES = ['pets', 'posts', 'events', 'meta'];
 // 백업에 포함할 저장소 (기능이 늘어나면 여기에 추가)
-export const BACKUP_STORES = ['pets', 'posts'];
+export const BACKUP_STORES = ['pets', 'posts', 'events'];
 
 let dbPromise;
 function open() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = () => {
+    req.onupgradeneeded = e => {
       const db = req.result;
-      db.createObjectStore('pets', { keyPath: 'id' });
-      db.createObjectStore('posts', { keyPath: 'id' });
-      db.createObjectStore('meta', { keyPath: 'key' });
+      // 버전별로 필요한 저장소만 추가한다 (이미 쓰던 기록은 그대로 유지)
+      if (e.oldVersion < 1) {
+        db.createObjectStore('pets', { keyPath: 'id' });
+        db.createObjectStore('posts', { keyPath: 'id' });
+        db.createObjectStore('meta', { keyPath: 'key' });
+      }
+      if (e.oldVersion < 2) db.createObjectStore('events', { keyPath: 'id' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -56,19 +60,20 @@ export async function remove(store, id) {
   });
 }
 
-// 반려동물과 그 기록을 한 번에 삭제
+// 반려동물과 그 아이의 추억·일정을 한 번에 삭제
 export async function removePetWithPosts(petId) {
   const db = await open();
-  const tx = db.transaction(['pets', 'posts'], 'readwrite');
+  const tx = db.transaction(['pets', 'posts', 'events'], 'readwrite');
   tx.objectStore('pets').delete(petId);
-  const posts = tx.objectStore('posts');
-  const cur = posts.openCursor();
-  cur.onsuccess = () => {
-    const c = cur.result;
-    if (!c) return;
-    if (c.value.petId === petId) c.delete();
-    c.continue();
-  };
+  for (const name of ['posts', 'events']) {
+    const cur = tx.objectStore(name).openCursor();
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) return;
+      if (c.value.petId === petId) c.delete();
+      c.continue();
+    };
+  }
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);

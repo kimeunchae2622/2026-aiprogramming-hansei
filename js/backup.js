@@ -37,7 +37,7 @@ export async function createBackupFile() {
     data[name] = await Promise.all((await getAll(name)).map(serializeRow));
   }
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  return { blob, name: backupFileName(), counts: { pets: data.pets.length, posts: data.posts.length } };
+  return { blob, name: backupFileName(), counts: { pets: data.pets.length, posts: data.posts.length, events: data.events.length } };
 }
 
 export async function downloadBackup() {
@@ -74,5 +74,15 @@ export async function parseBackup(text) {
     if (!petIds.has(p.petId)) continue; // 주인 없는 기록은 건너뜀
     posts.push(await reviveRow(p));
   }
-  return { pets, posts };
+  // 일정은 예전 백업 파일에는 없을 수 있다 (없으면 빈 목록)
+  const rawEvents = data.events === undefined ? [] : data.events;
+  if (!Array.isArray(rawEvents)) throw new Error('bad-file');
+  const events = [];
+  for (const e of rawEvents) {
+    if (!e || typeof e.id !== 'string' || typeof e.title !== 'string' ||
+        typeof e.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(e.date)) throw new Error('bad-file');
+    if (e.petId != null && !petIds.has(e.petId)) continue; // 없는 아이의 일정은 건너뜀
+    events.push(await reviveRow(e));
+  }
+  return { pets, posts, events };
 }

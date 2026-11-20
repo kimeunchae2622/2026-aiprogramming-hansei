@@ -75,3 +75,24 @@ export async function dataURLToBlob(url) {
   const res = await fetch(url);
   return res.blob();
 }
+
+/* ---------- 날짜 (모두 사용자 폰의 현지 시간 기준, 'YYYY-MM-DD' 문자열로 저장) ---------- */
+const pad2 = n => String(n).padStart(2, '0');
+export const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+
+export function ymd(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+export function parseYmd(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+export function isLeap(y) {
+  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+}
+// '15:30' -> '오후 3:30'
+export function formatClock(hhmm) {
+  if (!hhmm) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h < 12 ? '오전' : '오후'} ${h % 12 === 0 ? 12 : h % 12}:${pad2(m)}`;
+}

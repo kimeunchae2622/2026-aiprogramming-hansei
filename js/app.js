@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { h, uid, compressImage, formatTime } from './util.js';
+import { h, uid, compressImage, formatTime, ymd, parseYmd, isLeap, formatClock, WEEKDAYS } from './util.js';
 import { downloadBackup, parseBackup } from './backup.js';
 
 const SPECIES = {
@@ -11,13 +11,22 @@ const PAGE_SIZE = 20;
 const TEXT_MAX = 2000;
 const DAY = 86400000;
 
+const EVENT_TYPES = {
+  hospital: { label: '병원', emoji: '🏥' },
+  birthday: { label: '생일', emoji: '🎂' },
+  grooming: { label: '미용', emoji: '✂️' },
+  etc: { label: '기타', emoji: '📌' },
+};
+
 const TABS = [
   { id: 'feed', label: '추억', icon: '📖' },
+  { id: 'calendar', label: '달력', icon: '📅' },
   { id: 'more', label: '더보기', icon: '⚙️' },
 ];
 
 const state = {
-  pets: [], posts: [], filter: 'all', tab: 'feed',
+  pets: [], posts: [], events: [], filter: 'all',
+  calMonth: { y: new Date().getFullYear(), m: new Date().getMonth() }, calSel: ymd(new Date()), tab: 'feed',
   shown: PAGE_SIZE, lastBackup: undefined, lastPet: null, bannerHidden: false,
 };
 
@@ -27,11 +36,12 @@ const $ = sel => document.querySelector(sel);
 
 /* ---------- 데이터 불러오기 ---------- */
 async function load() {
-  const [pets, posts, lastBackup] = await Promise.all([
-    db.getAll('pets'), db.getAll('posts'), db.getMeta('lastBackup'),
+  const [pets, posts, events, lastBackup] = await Promise.all([
+    db.getAll('pets'), db.getAll('posts'), db.getAll('events'), db.getMeta('lastBackup'),
   ]);
   state.pets = pets.sort((a, b) => a.createdAt - b.createdAt);
   state.posts = posts.sort((a, b) => b.createdAt - a.createdAt);
+  state.events = events;
   state.lastBackup = lastBackup;
   if (state.filter !== 'all' && !state.pets.some(p => p.id === state.filter)) state.filter = 'all';
 }
@@ -240,12 +250,14 @@ function petForm({ pet, mkUrl, firstTime, onDone, onDeleted }) {
 
   if (pet && !firstTime) {
     const count = state.posts.filter(p => p.petId === pet.id).length;
+    const evCount = state.events.filter(e => e.petId === pet.id).length;
+    const what = [count && `추억 ${count}개`, evCount && `일정 ${evCount}개`].filter(Boolean).join('와 ');
     form.append(h('button', {
       type: 'button', class: 'btn link danger-text',
       onclick: async () => {
         const ok = await confirmBox({
           title: `${pet.name}을(를) 삭제할까요?`,
-          message: count ? `${pet.name}의 추억 ${count}개도 함께 삭제되고, 되돌릴 수 없어요.` : '되돌릴 수 없어요.',
+          message: what ? `${pet.name}의 ${what}도 함께 삭제되고, 되돌릴 수 없어요.` : '되돌릴 수 없어요.',
           ok: '삭제', danger: true,
         });
         if (!ok) return;
@@ -467,7 +479,7 @@ async function restoreFrom(file) {
   }
   const ok = await confirmBox({
     title: '백업으로 복원할까요?',
-    message: `지금 있는 기록(아이 ${state.pets.length}마리, 추억 ${state.posts.length}개)은 사라지고, 백업 파일의 기록(아이 ${parsed.pets.length}마리, 추억 ${parsed.posts.length}개)으로 바뀌어요.`,
+    message: `지금 있는 기록(아이 ${state.pets.length}마리, 추억 ${state.posts.length}개, 일정 ${state.events.length}개)은 사라지고, 백업 파일의 기록(아이 ${parsed.pets.length}마리, 추억 ${parsed.posts.length}개, 일정 ${parsed.events.length}개)으로 바뀌어요.`,
     ok: '복원하기', danger: true,
   });
   if (!ok) return;
@@ -537,9 +549,197 @@ function render() {
 
   root.append(...[
     h('header', { class: 'topbar' }, h('h1', {}, '🐾 추억 저장소')),
-    h('main', { class: 'main' }, state.tab === 'feed' ? renderFeed() : renderMore()),
+    h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, more: renderMore })[state.tab]()),
     state.tab === 'feed' && h('button', { class: 'fab', onclick: () => openCompose() }, '✏️ 글쓰기'),
     tabBar].filter(Boolean));
+}
+
+/* ---------- 화면: 달력 ---------- */
+const pad = n => String(n).padStart(2, '0');
+const dateLabel = ds => { const d = parseYmd(ds); return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS[d.getDay()]})`; };
+
+// 그 날짜에 해당하는 일정인가? (생일은 매년 같은 날 반복)
+function occursOn(ev, ds) {
+  if (ev.date === ds) return true;
+  if (ev.type !== 'birthday' || ds < ev.date) return false;
+  const [, em, ed] = ev.date.split('-').map(Number);
+  const [y, m, d] = ds.split('-').map(Number);
+  if (em === m && ed === d) return true;
+  return em === 2 && ed === 29 && m === 2 && d === 28 && !isLeap(y); // 2/29 생일은 평년엔 2/28
+}
+const eventsOn = ds => state.events.filter(e => occursOn(e, ds)).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+function upcomingEvents(limit = 5, horizonDays = 120) {
+  const out = [];
+  const now = new Date();
+  for (let i = 0; i < horizonDays && out.length < limit; i++) {
+    const ds = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
+    for (const ev of eventsOn(ds)) { out.push({ ev, ds, days: i }); if (out.length >= limit) break; }
+  }
+  return out;
+}
+
+function eventRow(ev, ds, { withDate = false, days = 0 } = {}) {
+  const pet = state.pets.find(p => p.id === ev.petId);
+  const t = EVENT_TYPES[ev.type] || EVENT_TYPES.etc;
+  const age = ev.type === 'birthday' ? Number(ds.slice(0, 4)) - Number(ev.date.slice(0, 4)) : 0;
+  const sub = [withDate && dateLabel(ds), formatClock(ev.time), pet && pet.name, age > 0 && `${age}살`].filter(Boolean).join(' · ');
+  const dday = withDate && (days === 0 ? '오늘' : days === 1 ? '내일' : `D-${days}`);
+  return h('button', { class: 'event-row', onclick: () => openEventSheet(ev) },
+    h('span', { class: 'event-icon type-' + ev.type, 'aria-hidden': 'true' }, t.emoji),
+    h('span', { class: 'event-text' }, h('strong', {}, ev.title), sub && h('small', {}, sub)),
+    dday && h('span', { class: 'dday' + (days === 0 ? ' today' : '') }, dday));
+}
+
+function moveMonth(delta) {
+  const d = new Date(state.calMonth.y, state.calMonth.m + delta, 1);
+  state.calMonth = { y: d.getFullYear(), m: d.getMonth() };
+  const today = new Date();
+  state.calSel = (d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth())
+    ? ymd(today) : ymd(d);
+  render();
+}
+
+function renderCalendar() {
+  const { y, m } = state.calMonth;
+  const now = new Date();
+  const today = ymd(now);
+  const dim = new Date(y, m + 1, 0).getDate();
+  const startDow = new Date(y, m, 1).getDay();
+
+  const cells = [];
+  for (let i = 0; i < startDow; i++) cells.push(h('span', { class: 'cal-blank' }));
+  for (let d = 1; d <= dim; d++) {
+    const ds = `${y}-${pad(m + 1)}-${pad(d)}`;
+    const evs = eventsOn(ds);
+    const types = [...new Set(evs.map(e => e.type))].slice(0, 3);
+    const dow = (startDow + d - 1) % 7;
+    cells.push(h('button', {
+      class: 'cal-day' + (ds === state.calSel ? ' sel' : '') + (ds === today ? ' today' : '') + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : ''),
+      'aria-label': `${m + 1}월 ${d}일${evs.length ? `, 일정 ${evs.length}개` : ''}`,
+      'aria-pressed': String(ds === state.calSel),
+      onclick: () => { state.calSel = ds; render(); },
+    }, h('span', { class: 'cal-num' }, d),
+    h('span', { class: 'cal-dots' }, types.map(t => h('i', { class: 'dot type-' + t })))));
+  }
+
+  const dayEvents = eventsOn(state.calSel);
+  const up = upcomingEvents();
+  const notThisMonth = y !== now.getFullYear() || m !== now.getMonth();
+  return h('div', { class: 'calendar' },
+    h('section', { class: 'card cal-card' },
+      h('div', { class: 'cal-head' },
+        h('button', { class: 'icon-btn', 'aria-label': '이전 달', onclick: () => moveMonth(-1) }, '‹'),
+        h('h2', {}, `${y}년 ${m + 1}월`),
+        h('button', { class: 'icon-btn', 'aria-label': '다음 달', onclick: () => moveMonth(1) }, '›')),
+      h('div', { class: 'cal-grid cal-week', 'aria-hidden': 'true' },
+        WEEKDAYS.map((w, i) => h('span', { class: i === 0 ? 'sun' : i === 6 ? 'sat' : '' }, w))),
+      h('div', { class: 'cal-grid' }, cells),
+      notThisMonth && h('button', {
+        class: 'btn link',
+        onclick: () => { state.calMonth = { y: now.getFullYear(), m: now.getMonth() }; state.calSel = today; render(); },
+      }, '오늘로 가기')),
+    h('section', { class: 'card' },
+      h('h2', {}, dateLabel(state.calSel)),
+      dayEvents.length
+        ? h('div', { class: 'event-list' }, dayEvents.map(ev => eventRow(ev, state.calSel)))
+        : h('p', { class: 'muted' }, '이 날은 일정이 없어요.'),
+      h('button', { class: 'btn primary block', onclick: () => openEventSheet(null, state.calSel) }, '＋ 일정 추가')),
+    h('section', { class: 'card' },
+      h('h2', {}, '다가오는 일정'),
+      up.length
+        ? h('div', { class: 'event-list' }, up.map(u => eventRow(u.ev, u.ds, { withDate: true, days: u.days })))
+        : h('p', { class: 'muted' }, '곧 다가오는 일정이 없어요. 병원 예약이나 생일을 적어 두면 여기에 보여요.')));
+}
+
+function openEventSheet(ev, presetDate) {
+  const editing = !!ev;
+  let type = ev?.type || 'hospital';
+  let petId = ev ? ev.petId : (state.pets.length === 1 ? state.pets[0].id : (state.filter !== 'all' ? state.filter : null));
+  let lastAuto = '';
+
+  return openSheet(editing ? '일정 수정' : '새 일정', api => {
+    const title = h('input', { class: 'input', type: 'text', maxLength: 40, value: ev?.title || '', placeholder: '예: 예방접종', 'aria-label': '제목', autocomplete: 'off' });
+    const date = h('input', { class: 'input', type: 'date', value: ev?.date || presetDate || ymd(new Date()), 'aria-label': '날짜' });
+    const time = h('input', { class: 'input', type: 'time', value: ev?.time || '', 'aria-label': '시간 (선택)' });
+    const memo = h('textarea', { class: 'input textarea memo', maxLength: 300, rows: 3, value: ev?.memo || '', placeholder: '메모 (선택)', 'aria-label': '메모' });
+    const error = h('p', { class: 'field-error', role: 'alert' });
+    const typeRow = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': '종류' });
+    const petRow = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': '누구의 일정인가요' });
+    const dateLabelEl = h('label', { class: 'label' });
+    const save = h('button', { type: 'button', class: 'btn primary block' }, editing ? '저장' : '추가');
+
+    // 제목을 비워 뒀거나 자동으로 채운 그대로라면, 종류·아이를 바꿀 때 제목도 맞춰 준다
+    const autoTitle = () => {
+      const pet = state.pets.find(p => p.id === petId);
+      const who = pet ? `${pet.name} ` : '';
+      return { hospital: `${who}병원 예약`, birthday: `${who}생일`, grooming: `${who}미용`, etc: '' }[type];
+    };
+    const applyAuto = () => {
+      if (!title.value.trim() || title.value === lastAuto) { lastAuto = autoTitle(); title.value = lastAuto; }
+    };
+    const drawDateLabel = () => dateLabelEl.replaceChildren(
+      type === 'birthday' ? '태어난 날 (매년 반복돼요)' : '날짜', date);
+    const drawType = () => {
+      typeRow.replaceChildren(...Object.entries(EVENT_TYPES).map(([k, t]) => h('button', {
+        type: 'button', class: 'chip' + (type === k ? ' active' : ''), role: 'radio', 'aria-checked': String(type === k),
+        onclick: () => { type = k; drawType(); applyAuto(); },
+      }, `${t.emoji} ${t.label}`)));
+      drawDateLabel();
+    };
+    const drawPets = () => petRow.replaceChildren(
+      h('button', { type: 'button', class: 'chip' + (petId == null ? ' active' : ''), role: 'radio', 'aria-checked': String(petId == null), onclick: () => { petId = null; drawPets(); applyAuto(); } }, '모두'),
+      ...state.pets.map(p => h('button', {
+        type: 'button', class: 'chip' + (p.id === petId ? ' active' : ''), role: 'radio', 'aria-checked': String(p.id === petId),
+        onclick: () => { petId = p.id; drawPets(); applyAuto(); },
+      }, avatar(p, 24, api.url), p.name)));
+
+    save.addEventListener('click', async () => {
+      error.textContent = '';
+      const t = title.value.trim();
+      if (!t) { error.textContent = '제목을 입력해 주세요.'; title.focus(); return; }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date.value)) { error.textContent = '날짜를 골라 주세요.'; return; }
+      save.disabled = true;
+      try {
+        await db.put('events', {
+          id: ev?.id || uid(), petId, type, title: t, date: date.value, time: time.value || '',
+          memo: memo.value.trim(), createdAt: ev?.createdAt || Date.now(),
+        });
+        api.close();
+        if (type !== 'birthday') { // 생일은 태어난 해가 과거라서, 보던 달을 그대로 둔다
+          state.calSel = date.value;
+          const d = parseYmd(date.value);
+          state.calMonth = { y: d.getFullYear(), m: d.getMonth() };
+        }
+        await reload();
+        toast(editing ? '수정했어요' : '일정을 추가했어요');
+      } catch (err) { toast(friendlyError(err)); save.disabled = false; }
+    });
+
+    if (!editing) applyAuto();
+    drawType();
+    if (state.pets.length > 1) drawPets();
+    const form = h('div', { class: 'form' },
+      h('div', { class: 'label' }, '종류', typeRow),
+      state.pets.length > 1 && h('div', { class: 'label' }, '누구의 일정인가요?', petRow),
+      h('label', { class: 'label' }, '제목', title), error,
+      dateLabelEl,
+      h('label', { class: 'label' }, '시간 (선택)', time),
+      h('label', { class: 'label' }, '메모 (선택)', memo),
+      save);
+    if (editing) {
+      form.append(h('button', {
+        type: 'button', class: 'btn link danger-text',
+        onclick: async () => {
+          const ok = await confirmBox({ title: '이 일정을 삭제할까요?', message: '삭제하면 되돌릴 수 없어요.', ok: '삭제', danger: true });
+          if (!ok) return;
+          try { await db.remove('events', ev.id); api.close(); await reload(); toast('삭제했어요'); }
+          catch (err) { toast(friendlyError(err)); }
+        },
+      }, '일정 삭제하기'));
+    }
+    return form;
+  });
 }
 
 /* ---------- "방금 전" 같은 시간 표시 자동 갱신 ---------- */
