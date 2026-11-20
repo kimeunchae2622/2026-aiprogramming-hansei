@@ -1,6 +1,7 @@
 import * as db from './db.js';
 import { h, uid, compressImage, formatTime, ymd, parseYmd, isLeap, formatClock, WEEKDAYS } from './util.js';
 import { downloadBackup, parseBackup } from './backup.js';
+import { renderMapTab, destroyMap } from './map.js';
 
 const SPECIES = {
   dog: { label: '강아지', emoji: '🐶' },
@@ -21,6 +22,7 @@ const EVENT_TYPES = {
 const TABS = [
   { id: 'feed', label: '추억', icon: '📖' },
   { id: 'calendar', label: '달력', icon: '📅' },
+  { id: 'map', label: '지도', icon: '🗺️' },
   { id: 'more', label: '더보기', icon: '⚙️' },
 ];
 
@@ -537,6 +539,7 @@ function renderMore() {
 function render() {
   urls.forEach(u => URL.revokeObjectURL(u));
   urls = [];
+  destroyMap();
   const root = $('#app');
   root.replaceChildren();
   if (!state.pets.length) { root.append(renderOnboarding()); return; }
@@ -549,7 +552,7 @@ function render() {
 
   root.append(...[
     h('header', { class: 'topbar' }, h('h1', {}, '🐾 추억 저장소')),
-    h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, more: renderMore })[state.tab]()),
+    h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, map: () => renderMapTab(toast), more: renderMore })[state.tab]()),
     state.tab === 'feed' && h('button', { class: 'fab', onclick: () => openCompose() }, '✏️ 글쓰기'),
     tabBar].filter(Boolean));
 }
