@@ -324,3 +324,8 @@ img { max-width: 100%; }
 .round-label { font-size: .8rem; font-weight: 600; white-space: nowrap; }
 .round-btn { min-width: 0; }
 .swatch { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); }
+
+/* ---------- 설치 안내 ---------- */
+.banner.info { background: #e8f3ff; }
+.steps { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; }
+.steps li { padding-left: 4px; }

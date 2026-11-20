@@ -31,7 +31,7 @@ const TABS = [
 const state = {
   pets: [], posts: [], events: [], characters: [], carePet: null, filter: 'all',
   calMonth: { y: new Date().getFullYear(), m: new Date().getMonth() }, calSel: ymd(new Date()), tab: 'feed',
-  shown: PAGE_SIZE, lastBackup: undefined, lastPet: null, bannerHidden: false,
+  shown: PAGE_SIZE, lastBackup: undefined, lastPet: null, bannerHidden: false, installTipHidden: false,
 };
 
 let urls = [];
@@ -40,14 +40,15 @@ const $ = sel => document.querySelector(sel);
 
 /* ---------- 데이터 불러오기 ---------- */
 async function load() {
-  const [pets, posts, events, characters, lastBackup] = await Promise.all([
-    db.getAll('pets'), db.getAll('posts'), db.getAll('events'), db.getAll('characters'), db.getMeta('lastBackup'),
+  const [pets, posts, events, characters, lastBackup, tipHidden] = await Promise.all([
+    db.getAll('pets'), db.getAll('posts'), db.getAll('events'), db.getAll('characters'), db.getMeta('lastBackup'), db.getMeta('installTipHidden'),
   ]);
   state.pets = pets.sort((a, b) => a.createdAt - b.createdAt);
   state.posts = posts.sort((a, b) => b.createdAt - a.createdAt);
   state.events = events;
   state.characters = characters;
   state.lastBackup = lastBackup;
+  state.installTipHidden = !!tipHidden;
   if (state.filter !== 'all' && !state.pets.some(p => p.id === state.filter)) state.filter = 'all';
 }
 
@@ -408,11 +409,30 @@ function renderOnboarding() {
     h('div', { class: 'card' }, form));
 }
 
+/* ---------- 홈 화면에 추가(앱처럼 쓰기) ---------- */
+let installPrompt = null; // 안드로이드 크롬이 알려 주는 "설치" 기능
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; if (state.pets.length) render(); });
+window.addEventListener('appinstalled', () => { installPrompt = null; if (state.pets.length) render(); });
+
+const isStandalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+function installSteps() {
+  if (isIOS()) {
+    return ['사파리(Safari)로 이 주소를 열어요. (다른 앱 안에서 열었다면 사파리로 옮겨 주세요)', '화면 아래 가운데의 공유 버튼(네모에 위쪽 화살표)을 눌러요.', '"홈 화면에 추가"를 고르고 오른쪽 위 "추가"를 눌러요.'];
+  }
+  return ['크롬(Chrome)에서 이 주소를 열어요.', '오른쪽 위 ⋮ 버튼을 눌러요.', '"홈 화면에 추가" 또는 "앱 설치"를 눌러요.'];
+}
+
 /* ---------- 화면: 추억(피드) ---------- */
 function backupBannerNeeded() {
   if (state.bannerHidden || !state.posts.length) return false;
   if (state.lastBackup === undefined) return state.posts.length >= 3;
   return Date.now() - state.lastBackup > 30 * DAY;
+}
+
+function installBannerNeeded() {
+  return !state.installTipHidden && !isStandalone() && state.posts.length >= 1;
 }
 
 function postCard(post) {
@@ -448,6 +468,17 @@ function renderFeed() {
       h('div', { class: 'banner-actions' },
         h('button', { class: 'btn small primary', onclick: () => { state.tab = 'more'; render(); window.scrollTo(0, 0); } }, '백업하러 가기'),
         h('button', { class: 'btn small link', onclick: () => { state.bannerHidden = true; render(); } }, '나중에'))));
+  }
+
+  if (!backupBannerNeeded() && installBannerNeeded()) {
+    wrap.append(h('div', { class: 'banner info' },
+      h('span', {}, '📲 홈 화면에 추가하면 앱처럼 바로 열 수 있어요.'),
+      h('div', { class: 'banner-actions' },
+        h('button', { class: 'btn small primary', onclick: () => { state.tab = 'more'; render(); window.scrollTo(0, 0); } }, '방법 보기'),
+        h('button', {
+          class: 'btn small link',
+          onclick: async () => { state.installTipHidden = true; render(); try { await db.setMeta('installTipHidden', true); } catch { /* 다음에 다시 보일 뿐 */ } },
+        }, '닫기'))));
   }
 
   const list = state.filter === 'all' ? state.posts : state.posts.filter(p => p.petId === state.filter);
@@ -517,6 +548,20 @@ function renderMore() {
             h('small', {}, `${(SPECIES[p.species] || SPECIES.other).label} · 추억 ${state.posts.filter(x => x.petId === p.id).length}개`)),
           h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))))),
       h('button', { class: 'btn soft block', onclick: () => openPetSheet() }, '＋ 반려동물 추가')),
+    !isStandalone() && h('section', { class: 'card' },
+      h('h2', {}, '📲 앱처럼 쓰기'),
+      h('p', { class: 'muted' }, '홈 화면에 추가하면 앱 아이콘을 눌러 바로 열 수 있어요. 따로 설치할 필요는 없어요.'),
+      installPrompt && h('button', {
+        class: 'btn primary block',
+        onclick: async () => {
+          const ev = installPrompt;
+          installPrompt = null;
+          ev.prompt();
+          try { await ev.userChoice; } catch { /* 닫음 */ }
+          render();
+        },
+      }, '홈 화면에 추가하기'),
+      h('ol', { class: 'steps' }, installSteps().map(t => h('li', {}, t)))),
     h('section', { class: 'card' },
       h('h2', {}, '기록 보관'),
       h('p', { class: 'muted' }, '추억은 이 폰 안에만 저장돼요. 폰을 바꾸거나 인터넷 사용 기록을 지우면 사라질 수 있어서, 가끔 백업 파일을 저장해 두면 안전해요. 파일은 폰의 다운로드 폴더에 저장돼요.'),

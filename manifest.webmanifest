@@ -1,9 +1,20 @@
 {
+  "id": "./",
   "name": "반려동물 추억 저장소",
   "short_name": "추억저장소",
+  "description": "우리 아이의 추억과 일정을 나만 볼 수 있게 폰에 담아 두는 앱",
+  "lang": "ko",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#fff6ee",
+  "orientation": "portrait",
+  "background_color": "#fff8f1",
   "theme_color": "#ff9f68",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "categories": ["lifestyle", "photo"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
 }
