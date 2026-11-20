@@ -1,0 +1,19 @@
+# 비밀 정보 (절대 커밋 금지)
+.env
+.env.*
+*.key
+secrets*
+config.local.*
+
+# 빌드/환경
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
+*.spec
+.vscode/
+.DS_Store
+Thumbs.db
