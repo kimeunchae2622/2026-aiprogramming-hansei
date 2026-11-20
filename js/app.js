@@ -405,7 +405,7 @@ function postCard(post) {
       avatar(pet, 40),
       h('div', { class: 'post-meta' },
         h('strong', {}, pet ? pet.name : '(삭제된 아이)'),
-        h('time', { datetime: new Date(post.createdAt).toISOString() }, formatTime(post.createdAt))),
+        h('time', { datetime: new Date(post.createdAt).toISOString(), 'data-ts': post.createdAt }, formatTime(post.createdAt))),
       h('button', { class: 'icon-btn', 'aria-label': '더보기', onclick: () => openPostMenu(post) }, '⋯')),
     post.text && h('p', { class: 'post-text' }, post.text),
     post.photo && h('button', { class: 'post-photo', 'aria-label': '사진 크게 보기', onclick: () => openViewer(post.photo) },
@@ -541,6 +541,19 @@ function render() {
     state.tab === 'feed' && h('button', { class: 'fab', onclick: () => openCompose() }, '✏️ 글쓰기'),
     tabBar].filter(Boolean));
 }
+
+/* ---------- "방금 전" 같은 시간 표시 자동 갱신 ---------- */
+// 화면을 다시 그리지 않고 글자만 바꾼다 (스크롤·열린 창·입력 중인 내용이 유지됨)
+function refreshTimes() {
+  if (document.hidden) return;
+  const now = Date.now();
+  document.querySelectorAll('time[data-ts]').forEach(el => {
+    const text = formatTime(Number(el.dataset.ts), now);
+    if (el.textContent !== text) el.textContent = text;
+  });
+}
+setInterval(refreshTimes, 30000);
+document.addEventListener('visibilitychange', refreshTimes); // 앱으로 돌아오면 바로 갱신
 
 /* ---------- 시작 ---------- */
 async function start() {
