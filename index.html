@@ -4,20 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#ff9f68">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>반려동물 추억 저장소</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <style>
-    body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-      font-family:system-ui,-apple-system,"Malgun Gothic",sans-serif;background:#fff6ee;color:#4a3426;text-align:center;padding:24px}
-    .paw{font-size:64px}
-    h1{font-size:1.4rem;margin:12px 0 4px}
-    p{margin:0;color:#8a6f5c}
-  </style>
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="paw">🐾</div>
-  <h1>반려동물 추억 저장소</h1>
-  <p>준비 중입니다</p>
+  <div id="app"><p class="loading">불러오는 중…</p></div>
+  <div id="modal-root"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <noscript><p class="loading">이 앱을 쓰려면 자바스크립트가 켜져 있어야 해요.</p></noscript>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
