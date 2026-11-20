@@ -3,6 +3,8 @@ import { h, uid, compressImage, formatTime, ymd, parseYmd, isLeap, formatClock, 
 import { downloadBackup, parseBackup } from './backup.js';
 import { renderMapTab, destroyMap } from './map.js';
 import { renderCareTab } from './care.js';
+import { iconEl as ic } from './icons.js';
+import { getSettings, setSettings, STYLES, MODES, ACCENTS } from './theme.js';
 
 const SPECIES = {
   dog: { label: '강아지', emoji: '🐶' },
@@ -21,11 +23,11 @@ const EVENT_TYPES = {
 };
 
 const TABS = [
-  { id: 'feed', label: '추억', icon: '📖' },
-  { id: 'calendar', label: '달력', icon: '📅' },
-  { id: 'care', label: '돌보기', icon: '🐾' },
-  { id: 'map', label: '지도', icon: '🗺️' },
-  { id: 'more', label: '더보기', icon: '⚙️' },
+  { id: 'feed', label: '추억', icon: 'house' },
+  { id: 'calendar', label: '달력', icon: 'calendar-days' },
+  { id: 'care', label: '돌보기', icon: 'paw-print' },
+  { id: 'map', label: '지도', icon: 'map-pin' },
+  { id: 'more', label: '더보기', icon: 'sliders-horizontal' },
 ];
 
 const state = {
@@ -103,7 +105,7 @@ function openSheet(title, buildBody, { beforeClose } = {}) {
   box.append(
     h('div', { class: 'sheet-head' },
       h('h2', {}, title),
-      h('button', { class: 'icon-btn', 'aria-label': '닫기', onclick: () => api.tryClose() }, '✕')),
+      h('button', { class: 'icon-btn', 'aria-label': '닫기', onclick: () => api.tryClose() }, ic('x', { size: 22 }))),
     buildBody(api));
   back.addEventListener('click', e => { if (e.target === back) api.tryClose(); });
   back.append(box);
@@ -151,7 +153,7 @@ function openViewer(blob) {
     },
   };
   back.append(h('img', { src: url, alt: '사진' }),
-    h('button', { class: 'icon-btn viewer-close', 'aria-label': '닫기' }, '✕'));
+    h('button', { class: 'icon-btn viewer-close', 'aria-label': '닫기' }, ic('x', { size: 22 })));
   back.addEventListener('click', () => api.tryClose());
   root.append(back);
   overlayStack.push(api);
@@ -205,7 +207,7 @@ function petForm({ pet, mkUrl, firstTime, onDone, onDeleted }) {
   const saveBtn = h('button', { type: 'button', class: 'btn primary block' }, firstTime ? '시작하기' : '저장');
 
   const picker = photoPicker({
-    idleLabel: () => '📷 사진 고르기',
+    idleLabel: () => '사진 고르기',
     onBusy: b => { busy = b; saveBtn.disabled = b; },
     onPick: blob => { photo = blob; drawPhoto(); },
   });
@@ -325,7 +327,7 @@ function openCompose(post) {
       }, avatar(p, 24, api.url), p.name)));
     };
     const picker = photoPicker({
-      idleLabel: () => (photo ? '📷 사진 바꾸기' : '📷 사진 추가'),
+      idleLabel: () => (photo ? '사진 바꾸기' : '사진 추가'),
       onBusy: b => { busy = b; refresh(); },
       onPick: blob => { photo = blob; drawPhoto(); },
     });
@@ -334,7 +336,7 @@ function openCompose(post) {
       photoBox.replaceChildren(...[
         photo && h('div', { class: 'thumb' },
           h('img', { src: api.url(photo), alt: '첨부한 사진' }),
-          h('button', { type: 'button', class: 'thumb-x', 'aria-label': '사진 빼기', onclick: () => { photo = null; drawPhoto(); refresh(); } }, '✕')),
+          h('button', { type: 'button', class: 'thumb-x', 'aria-label': '사진 빼기', onclick: () => { photo = null; drawPhoto(); refresh(); } }, ic('x', { size: 20 }))),
         picker.btn].filter(Boolean));
       refresh();
     }
@@ -355,7 +357,7 @@ function openCompose(post) {
         state.shown = Math.max(state.shown, PAGE_SIZE);
         await reload();
         window.scrollTo(0, 0);
-        toast(editing ? '수정했어요' : '추억을 남겼어요 🐾');
+        toast(editing ? '수정했어요' : '추억을 남겼어요');
       } catch (err) {
         toast(friendlyError(err));
         refresh();
@@ -379,7 +381,7 @@ function openCompose(post) {
 
 function openPostMenu(post) {
   openSheet('이 추억', api => h('div', { class: 'menu' },
-    h('button', { class: 'btn soft block', onclick: () => { api.close(); openCompose(post); } }, '✏️ 수정하기'),
+    h('button', { class: 'btn soft block', onclick: () => { api.close(); openCompose(post); } }, ic('pencil', { size: 20 }), '수정하기'),
     h('button', {
       class: 'btn soft block danger-text',
       onclick: async () => {
@@ -392,18 +394,18 @@ function openPostMenu(post) {
           toast('삭제했어요');
         } catch (err) { toast(friendlyError(err)); }
       },
-    }, '🗑️ 삭제하기')));
+    }, ic('trash-2', { size: 20 }), '삭제하기')));
 }
 
 /* ---------- 화면: 시작(첫 실행) ---------- */
 function renderOnboarding() {
   const form = petForm({
     firstTime: true, mkUrl: blobUrl,
-    onDone: async saved => { state.filter = saved.id; state.lastPet = saved.id; await reload(); toast(`${saved.name}, 반가워요! 🐾`); },
+    onDone: async saved => { state.filter = saved.id; state.lastPet = saved.id; await reload(); toast(`${saved.name}, 반가워요!`); },
     onDeleted: () => {},
   });
   return h('main', { class: 'welcome' },
-    h('div', { class: 'welcome-hero' }, '🐾'),
+    h('div', { class: 'welcome-hero' }, ic('paw-print', { size: 46, fill: true })),
     h('h1', {}, '우리 아이를 소개해 주세요'),
     h('p', { class: 'muted' }, '추억은 이 폰에만 저장돼요. 나만 볼 수 있어요.'),
     h('div', { class: 'card' }, form));
@@ -435,63 +437,149 @@ function installBannerNeeded() {
   return !state.installTipHidden && !isStandalone() && state.posts.length >= 1;
 }
 
-function postCard(post) {
+const isLong = text => !!text && (text.length > 110 || text.split('\n').length > 3);
+
+async function toggleFav(post) {
+  try {
+    await db.put('posts', { ...post, fav: !post.fav });
+    post.fav = !post.fav;
+    return true;
+  } catch (err) { toast(friendlyError(err)); return false; }
+}
+
+// 하트(좋아요) 버튼: 소중한 추억 표시. 누르면 통통 튄다.
+function heartButton(post) {
+  const btn = h('button', { class: 'icon-btn heart-btn', type: 'button' });
+  btn.sync = () => {
+    btn.classList.toggle('on', !!post.fav);
+    btn.setAttribute('aria-pressed', String(!!post.fav));
+    btn.setAttribute('aria-label', post.fav ? '좋아요 취소' : '좋아요');
+    btn.replaceChildren(ic('heart', { size: 26, fill: !!post.fav }));
+  };
+  btn.addEventListener('click', async () => {
+    if (!(await toggleFav(post))) return;
+    btn.sync();
+    btn.classList.remove('pop'); void btn.offsetWidth; btn.classList.add('pop');
+  });
+  btn.sync();
+  return btn;
+}
+
+// 사진: 한 번 누르면 크게 보기, (카드형은) 두 번 누르면 좋아요
+function photoButton(post, { doubleTapLike = false, heart } = {}) {
+  const big = doubleTapLike ? h('span', { class: 'big-heart', 'aria-hidden': 'true' }, ic('heart', { size: 96, fill: true })) : null;
+  let timer = null;
+  const btn = h('button', { class: 'post-photo', type: 'button', 'aria-label': '사진 크게 보기' },
+    h('img', { src: blobUrl(post.photo), alt: '', loading: 'lazy' }), big);
+  btn.addEventListener('click', () => {
+    if (!doubleTapLike) { openViewer(post.photo); return; }
+    if (timer) { // 두 번째 누름 = 좋아요
+      clearTimeout(timer); timer = null;
+      (async () => {
+        if (!post.fav && !(await toggleFav(post))) return;
+        if (heart) heart.sync();
+        big.classList.remove('show'); void big.offsetWidth; big.classList.add('show');
+      })();
+      return;
+    }
+    timer = setTimeout(() => { timer = null; openViewer(post.photo); }, 260);
+  });
+  return btn;
+}
+
+function withReadMore(node, long) {
+  if (!long) return [node];
+  node.classList.add('clamp');
+  const more = h('button', { class: 'read-more', type: 'button', onclick: e => { node.classList.remove('clamp'); e.currentTarget.remove(); } }, '더 보기');
+  return [node, more];
+}
+
+const timeEl = post => h('time', { datetime: new Date(post.createdAt).toISOString(), 'data-ts': post.createdAt }, formatTime(post.createdAt));
+const petName = pet => (pet ? pet.name : '(삭제된 아이)');
+
+// 디자인 A: 카드형
+function postCardCard(post) {
   const pet = state.pets.find(p => p.id === post.petId);
-  return h('article', { class: 'post' },
+  const heart = heartButton(post);
+  const caption = post.text && h('div', { class: 'caption' }, h('strong', {}, petName(pet)), h('span', { class: 'post-text' }, post.text));
+  return h('article', { class: 'post card-style' },
     h('header', { class: 'post-head' },
-      avatar(pet, 40),
-      h('div', { class: 'post-meta' },
-        h('strong', {}, pet ? pet.name : '(삭제된 아이)'),
-        h('time', { datetime: new Date(post.createdAt).toISOString(), 'data-ts': post.createdAt }, formatTime(post.createdAt))),
-      h('button', { class: 'icon-btn', 'aria-label': '더보기', onclick: () => openPostMenu(post) }, '⋯')),
-    post.text && h('p', { class: 'post-text' }, post.text),
-    post.photo && h('button', { class: 'post-photo', 'aria-label': '사진 크게 보기', onclick: () => openViewer(post.photo) },
-      h('img', { src: blobUrl(post.photo), alt: '', loading: 'lazy' })));
+      avatar(pet, 36),
+      h('div', { class: 'post-meta' }, h('strong', {}, petName(pet)), timeEl(post)),
+      h('button', { class: 'icon-btn', 'aria-label': '이 추억 메뉴', onclick: () => openPostMenu(post) }, ic('ellipsis', { size: 24 }))),
+    post.photo && photoButton(post, { doubleTapLike: true, heart }),
+    h('div', { class: 'post-actions' }, heart),
+    caption && withReadMore(caption, isLong(post.text)));
+}
+
+// 디자인 B: 타임라인형
+function postCardTimeline(post) {
+  const pet = state.pets.find(p => p.id === post.petId);
+  const text = post.text && h('p', { class: 'post-text' }, post.text);
+  return h('article', { class: 'post tl-style' },
+    avatar(pet, 44),
+    h('div', { class: 'tl-body' },
+      h('div', { class: 'tl-head' },
+        h('strong', {}, petName(pet)), h('span', { class: 'sub' }, '·'), h('span', { class: 'sub' }, timeEl(post)),
+        h('button', { class: 'icon-btn', 'aria-label': '이 추억 메뉴', onclick: () => openPostMenu(post) }, ic('ellipsis', { size: 22 }))),
+      text && withReadMore(text, isLong(post.text)),
+      post.photo && photoButton(post),
+      h('div', { class: 'tl-actions' }, heartButton(post))));
+}
+
+function pickPet(id) { state.filter = id; state.shown = PAGE_SIZE; render(); }
+
+function petPicker(style) {
+  if (style === 'timeline') {
+    return h('div', { class: 'xtabs', role: 'tablist', 'aria-label': '아이 고르기' },
+      h('button', { class: 'xtab' + (state.filter === 'all' ? ' active' : ''), role: 'tab', onclick: () => pickPet('all') }, '전체'),
+      ...state.pets.map(p => h('button', { class: 'xtab' + (state.filter === p.id ? ' active' : ''), role: 'tab', onclick: () => pickPet(p.id) }, p.name)),
+      h('button', { class: 'xtab xtab-add', 'aria-label': '반려동물 추가', onclick: () => openPetSheet() }, ic('plus', { size: 22 })));
+  }
+  const story = (active, ring, name, onclick, extra = '') => h('button', { class: 'story' + (active ? ' active' : '') + extra, role: 'tab', onclick },
+    h('span', { class: 'story-ring' }, ring), h('span', { class: 'story-name' }, name));
+  return h('div', { class: 'stories', role: 'tablist', 'aria-label': '아이 고르기' },
+    story(state.filter === 'all', h('span', { class: 'story-all' }, ic('paw-print', { size: 26, fill: true })), '전체', () => pickPet('all')),
+    ...state.pets.map(p => story(state.filter === p.id, avatar(p, 60), p.name, () => pickPet(p.id))),
+    story(false, ic('plus', { size: 26 }), '추가', () => openPetSheet(), ' story-add'));
+}
+
+function banner(iconName, text, actions) {
+  return h('div', { class: 'banner' },
+    h('span', { class: 'banner-text' }, ic(iconName, { size: 20 }), text),
+    h('div', { class: 'banner-actions' }, actions));
 }
 
 function renderFeed() {
+  const style = getSettings().style;
   const wrap = h('div', {});
-  wrap.append(h('div', { class: 'filter', role: 'tablist', 'aria-label': '아이 고르기' },
-    h('button', {
-      class: 'chip' + (state.filter === 'all' ? ' active' : ''), role: 'tab',
-      onclick: () => { state.filter = 'all'; state.shown = PAGE_SIZE; render(); },
-    }, '전체'),
-    ...state.pets.map(p => h('button', {
-      class: 'chip' + (state.filter === p.id ? ' active' : ''), role: 'tab',
-      onclick: () => { state.filter = p.id; state.shown = PAGE_SIZE; render(); },
-    }, avatar(p, 24), p.name)),
-    h('button', { class: 'chip add', 'aria-label': '반려동물 추가', onclick: () => openPetSheet() }, '＋')));
+  wrap.append(petPicker(style));
 
+  const goMore = () => { state.tab = 'more'; render(); window.scrollTo(0, 0); };
   if (backupBannerNeeded()) {
-    wrap.append(h('div', { class: 'banner' },
-      h('span', {}, '🔒 소중한 추억을 잃어버리지 않게 백업해 두세요.'),
-      h('div', { class: 'banner-actions' },
-        h('button', { class: 'btn small primary', onclick: () => { state.tab = 'more'; render(); window.scrollTo(0, 0); } }, '백업하러 가기'),
-        h('button', { class: 'btn small link', onclick: () => { state.bannerHidden = true; render(); } }, '나중에'))));
-  }
-
-  if (!backupBannerNeeded() && installBannerNeeded()) {
-    wrap.append(h('div', { class: 'banner info' },
-      h('span', {}, '📲 홈 화면에 추가하면 앱처럼 바로 열 수 있어요.'),
-      h('div', { class: 'banner-actions' },
-        h('button', { class: 'btn small primary', onclick: () => { state.tab = 'more'; render(); window.scrollTo(0, 0); } }, '방법 보기'),
-        h('button', {
-          class: 'btn small link',
-          onclick: async () => { state.installTipHidden = true; render(); try { await db.setMeta('installTipHidden', true); } catch { /* 다음에 다시 보일 뿐 */ } },
-        }, '닫기'))));
+    wrap.append(banner('shield-check', '소중한 추억을 잃어버리지 않게 백업해 두세요.', [
+      h('button', { class: 'btn small primary', onclick: goMore }, '백업하러 가기'),
+      h('button', { class: 'btn small link', onclick: () => { state.bannerHidden = true; render(); } }, '나중에')]));
+  } else if (installBannerNeeded()) {
+    wrap.append(banner('smartphone', '홈 화면에 추가하면 앱처럼 바로 열 수 있어요.', [
+      h('button', { class: 'btn small primary', onclick: goMore }, '방법 보기'),
+      h('button', {
+        class: 'btn small link',
+        onclick: async () => { state.installTipHidden = true; render(); try { await db.setMeta('installTipHidden', true); } catch { /* 다음에 다시 보일 뿐 */ } },
+      }, '닫기')]));
   }
 
   const list = state.filter === 'all' ? state.posts : state.posts.filter(p => p.petId === state.filter);
   if (!list.length) {
     const pet = state.pets.find(p => p.id === state.filter);
     wrap.append(h('div', { class: 'empty' },
-      h('div', { class: 'empty-icon' }, '📖'),
+      h('div', { class: 'empty-icon' }, ic('image-plus', { size: 34 })),
       h('h2', {}, pet ? `${pet.name}의 첫 추억을 남겨 보세요` : '첫 추억을 남겨 보세요'),
       h('p', { class: 'muted' }, '글만 써도 되고, 사진을 함께 올려도 돼요.'),
-      h('button', { class: 'btn primary', onclick: () => openCompose() }, '✏️ 추억 쓰기')));
+      h('button', { class: 'btn primary', onclick: () => openCompose() }, ic('pen-line', { size: 20 }), '추억 쓰기')));
   } else {
     const shown = list.slice(0, state.shown);
-    wrap.append(h('div', { class: 'posts' }, shown.map(postCard)));
+    wrap.append(h('div', { class: 'posts' }, shown.map(style === 'timeline' ? postCardTimeline : postCardCard)));
     if (list.length > shown.length) {
       wrap.append(h('button', { class: 'btn soft block more-btn', onclick: () => { state.shown += PAGE_SIZE; render(); } },
         `이전 추억 더 보기 (${list.length - shown.length}개 남음)`));
@@ -529,6 +617,46 @@ async function restoreFrom(file) {
   }
 }
 
+/* ---------- 꾸미기 (디자인·색상·밝기) ---------- */
+function renderThemeCard() {
+  const cur = getSettings();
+  const apply = patch => { setSettings(patch); render(); };
+
+  const mockCard = h('div', { class: 'mock' },
+    h('div', { class: 'stor' }, h('b'), h('b'), h('b')), h('div', { class: 'img' }), h('i', { class: 'ln' }));
+  const mockTl = h('div', { class: 'mock' },
+    h('div', { class: 'row' }, h('span', { class: 'dot-a' }), h('i', { class: 'ln' })),
+    h('div', { class: 'row' }, h('span', { class: 'dot-a' }), h('i', { class: 'ln' })),
+    h('div', { class: 'row' }, h('span', { class: 'dot-a' }), h('i', { class: 'ln' })));
+  const styleOpt = (key, mock) => h('button', {
+    class: 'style-opt' + (cur.style === key ? ' active' : ''), type: 'button', 'aria-pressed': String(cur.style === key),
+    onclick: () => apply({ style: key }),
+  }, mock, h('strong', {}, STYLES[key].label), h('small', {}, STYLES[key].desc));
+
+  const preset = ACCENTS.some(a => a.color === cur.accent);
+  const colorInput = h('input', { type: 'color', value: cur.accent, 'aria-label': '원하는 색 고르기' });
+  colorInput.addEventListener('input', () => setSettings({ accent: colorInput.value }));
+  colorInput.addEventListener('change', () => apply({ accent: colorInput.value }));
+
+  return h('section', { class: 'card' },
+    h('h2', { class: 'section-title' }, ic('palette', { size: 22 }), '꾸미기'),
+    h('div', { class: 'label' }, '디자인', h('div', { class: 'style-picker' }, styleOpt('card', mockCard), styleOpt('timeline', mockTl))),
+    h('div', { class: 'label' }, '포인트 색',
+      h('div', { class: 'swatches' },
+        ACCENTS.map(a => h('button', {
+          class: 'swatch-btn' + (cur.accent === a.color ? ' active' : ''), type: 'button', style: `background:${a.color}`,
+          'aria-label': a.label, 'aria-pressed': String(cur.accent === a.color), onclick: () => apply({ accent: a.color }),
+        }, cur.accent === a.color && ic('check', { size: 20, stroke: 3 }))),
+        h('label', { class: 'swatch-btn swatch-custom' + (preset ? '' : ' active'), 'aria-label': '직접 고르기' },
+          colorInput, !preset && ic('check', { size: 20, stroke: 3 })))),
+    h('div', { class: 'label' }, '밝기',
+      h('div', { class: 'seg', role: 'radiogroup', 'aria-label': '밝기' },
+        Object.entries(MODES).map(([k, label]) => h('button', {
+          type: 'button', class: cur.mode === k ? 'active' : '', role: 'radio', 'aria-checked': String(cur.mode === k),
+          onclick: () => apply({ mode: k }),
+        }, k === 'light' && ic('sun', { size: 18 }), k === 'dark' && ic('moon', { size: 18 }), label)))));
+}
+
 function renderMore() {
   const restoreInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true });
   restoreInput.addEventListener('change', async () => {
@@ -537,19 +665,20 @@ function renderMore() {
     if (file) await restoreFrom(file);
   });
 
-  return h('div', { class: 'more' },
+  return h('div', { class: 'page more' },
     h('section', { class: 'card' },
-      h('h2', {}, '우리 아이들'),
+      h('h2', { class: 'section-title' }, ic('users', { size: 22 }), '우리 아이들'),
       h('ul', { class: 'pet-list' }, state.pets.map(p => h('li', {},
         h('button', { class: 'pet-row', onclick: () => openPetSheet(p) },
           avatar(p, 44),
           h('span', { class: 'pet-row-text' },
             h('strong', {}, p.name),
             h('small', {}, `${(SPECIES[p.species] || SPECIES.other).label} · 추억 ${state.posts.filter(x => x.petId === p.id).length}개`)),
-          h('span', { class: 'chev', 'aria-hidden': 'true' }, '›'))))),
-      h('button', { class: 'btn soft block', onclick: () => openPetSheet() }, '＋ 반려동물 추가')),
+          h('span', { class: 'chev', 'aria-hidden': 'true' }, ic('chevron-right', { size: 22 })))))),
+      h('button', { class: 'btn soft block', onclick: () => openPetSheet() }, ic('plus', { size: 20 }), '반려동물 추가')),
+    renderThemeCard(),
     !isStandalone() && h('section', { class: 'card' },
-      h('h2', {}, '📲 앱처럼 쓰기'),
+      h('h2', { class: 'section-title' }, ic('smartphone', { size: 22 }), '앱처럼 쓰기'),
       h('p', { class: 'muted' }, '홈 화면에 추가하면 앱 아이콘을 눌러 바로 열 수 있어요. 따로 설치할 필요는 없어요.'),
       installPrompt && h('button', {
         class: 'btn primary block',
@@ -563,7 +692,7 @@ function renderMore() {
       }, '홈 화면에 추가하기'),
       h('ol', { class: 'steps' }, installSteps().map(t => h('li', {}, t)))),
     h('section', { class: 'card' },
-      h('h2', {}, '기록 보관'),
+      h('h2', { class: 'section-title' }, ic('shield-check', { size: 22 }), '기록 보관'),
       h('p', { class: 'muted' }, '추억은 이 폰 안에만 저장돼요. 폰을 바꾸거나 인터넷 사용 기록을 지우면 사라질 수 있어서, 가끔 백업 파일을 저장해 두면 안전해요. 파일은 폰의 다운로드 폴더에 저장돼요.'),
       h('p', { class: 'backup-status' },
         state.lastBackup ? `마지막 백업: ${formatDate(state.lastBackup)}` : '아직 백업한 적이 없어요'),
@@ -578,8 +707,8 @@ function renderMore() {
             toast(`백업 파일을 저장했어요 (추억 ${counts.posts}개)`);
           } catch { toast('백업 파일을 만들지 못했어요.'); btn.disabled = false; }
         },
-      }, '💾 백업 파일 저장'),
-      h('button', { class: 'btn soft block', onclick: () => restoreInput.click() }, '📂 백업에서 복원'),
+      }, ic('download', { size: 20 }), '백업 파일 저장'),
+      h('button', { class: 'btn soft block', onclick: () => restoreInput.click() }, ic('upload', { size: 20 }), '백업에서 복원'),
       restoreInput));
 }
 
@@ -594,16 +723,22 @@ function render() {
   root.replaceChildren();
   if (!state.pets.length) { root.append(renderOnboarding()); return; }
 
-  const tabBar = h('nav', { class: 'tabbar', 'aria-label': '메뉴' }, TABS.map(t => h('button', {
+  const style = getSettings().style;
+  const tabBar = h('nav', { class: 'tabbar', 'aria-label': '메뉴' }, h('div', { class: 'tabbar-inner' }, TABS.map(t => h('button', {
     class: 'tab' + (state.tab === t.id ? ' active' : ''),
     'aria-current': state.tab === t.id ? 'page' : null,
     onclick: () => { if (state.tab !== t.id) { state.tab = t.id; render(); window.scrollTo(0, 0); } },
-  }, h('span', { class: 'tab-icon', 'aria-hidden': 'true' }, t.icon), t.label)));
+  }, ic(t.icon, { size: 24 }), t.label))));
+
+  const newPost = state.tab === 'feed' && style === 'card'
+    ? h('button', { class: 'icon-btn', 'aria-label': '새 추억 쓰기', onclick: () => openCompose() }, ic('plus', { size: 28 })) : null;
 
   root.append(...[
-    h('header', { class: 'topbar' }, h('h1', {}, '🐾 추억 저장소')),
+    h('header', { class: 'topbar' }, h('div', { class: 'topbar-row' },
+      h('h1', { class: 'brand' }, ic('paw-print', { size: 26, fill: true }), '추억 저장소'),
+      h('div', { class: 'topbar-actions' }, newPost))),
     h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, care: () => renderCareTab(careCtx), map: () => renderMapTab(toast), more: renderMore })[state.tab]()),
-    state.tab === 'feed' && h('button', { class: 'fab', onclick: () => openCompose() }, '✏️ 글쓰기'),
+    state.tab === 'feed' && style === 'timeline' && h('button', { class: 'fab', 'aria-label': '새 추억 쓰기', onclick: () => openCompose() }, ic('plus', { size: 30, stroke: 2.4 })),
     tabBar].filter(Boolean));
 }
 
@@ -679,12 +814,12 @@ function renderCalendar() {
   const dayEvents = eventsOn(state.calSel);
   const up = upcomingEvents();
   const notThisMonth = y !== now.getFullYear() || m !== now.getMonth();
-  return h('div', { class: 'calendar' },
+  return h('div', { class: 'page calendar' },
     h('section', { class: 'card cal-card' },
       h('div', { class: 'cal-head' },
-        h('button', { class: 'icon-btn', 'aria-label': '이전 달', onclick: () => moveMonth(-1) }, '‹'),
+        h('button', { class: 'icon-btn', 'aria-label': '이전 달', onclick: () => moveMonth(-1) }, ic('chevron-left', { size: 28 })),
         h('h2', {}, `${y}년 ${m + 1}월`),
-        h('button', { class: 'icon-btn', 'aria-label': '다음 달', onclick: () => moveMonth(1) }, '›')),
+        h('button', { class: 'icon-btn', 'aria-label': '다음 달', onclick: () => moveMonth(1) }, ic('chevron-right', { size: 28 }))),
       h('div', { class: 'cal-grid cal-week', 'aria-hidden': 'true' },
         WEEKDAYS.map((w, i) => h('span', { class: i === 0 ? 'sun' : i === 6 ? 'sat' : '' }, w))),
       h('div', { class: 'cal-grid' }, cells),
@@ -697,7 +832,7 @@ function renderCalendar() {
       dayEvents.length
         ? h('div', { class: 'event-list' }, dayEvents.map(ev => eventRow(ev, state.calSel)))
         : h('p', { class: 'muted' }, '이 날은 일정이 없어요.'),
-      h('button', { class: 'btn primary block', onclick: () => openEventSheet(null, state.calSel) }, '＋ 일정 추가')),
+      h('button', { class: 'btn primary block', onclick: () => openEventSheet(null, state.calSel) }, ic('plus', { size: 20 }), '일정 추가')),
     h('section', { class: 'card' },
       h('h2', {}, '다가오는 일정'),
       up.length
@@ -818,7 +953,7 @@ async function start() {
     render();
   } catch {
     $('#app').replaceChildren(h('main', { class: 'welcome' },
-      h('div', { class: 'welcome-hero' }, '😿'),
+      h('div', { class: 'welcome-hero' }, ic('info', { size: 44 })),
       h('h1', {}, '저장 기능을 쓸 수 없어요'),
       h('p', { class: 'muted' }, '인터넷 브라우저의 시크릿(비공개) 모드라면 끄고 다시 열어 주세요. 계속 안 되면 다른 브라우저(크롬, 사파리)로 열어 보세요.')));
   }

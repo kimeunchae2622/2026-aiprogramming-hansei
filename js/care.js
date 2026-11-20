@@ -2,6 +2,7 @@
 import { h } from './util.js';
 import * as db from './db.js';
 import { characterSvg, KINDS, FURS, COLORS } from './character.js';
+import { iconEl as ic } from './icons.js';
 
 // 한 시간에 줄어드는 양 (밥 3, 기분 2, 청결 1.5 → 하루 비워도 크게 슬퍼지지 않는다)
 const RATES = { full: 3, happy: 2, clean: 1.5 };
@@ -115,7 +116,7 @@ export function renderCareTab(ctx) {
 
   if (!ch) {
     const defKind = pet.species === 'cat' ? 'cat' : 'dog';
-    return h('div', { class: 'care' }, chips,
+    return h('div', { class: 'page care' }, chips,
       h('section', { class: 'card' },
         h('h2', {}, `${pet.name}의 캐릭터를 만들어요`),
         h('p', { class: 'muted' }, '우리 아이와 닮은 모습을 골라 보세요. 나중에 언제든 바꿀 수 있어요.'),
@@ -126,7 +127,7 @@ export function renderCareTab(ctx) {
               const now = Date.now();
               await db.put('characters', { id: pet.id, ...look, full: 80, happy: 80, clean: 80, at: now, createdAt: now });
               await ctx.reload();
-              ctx.toast(`${pet.name} 캐릭터가 생겼어요! 🐾`);
+              ctx.toast(`${pet.name} 캐릭터가 생겼어요!`);
             } catch { ctx.toast('저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
           },
         })));
@@ -189,7 +190,7 @@ export function renderCareTab(ctx) {
       h('span', { class: 'round-label' }, a.label))));
 
   paint();
-  return h('div', { class: 'care' }, chips,
+  return h('div', { class: 'page care' }, chips,
     h('section', { class: 'card stage-card' },
       h('div', { class: 'stage' }, bubble, svgBox, fx),
       h('p', { class: 'char-name' }, pet.name),
@@ -207,5 +208,5 @@ export function renderCareTab(ctx) {
             } catch { ctx.toast('저장하지 못했어요. 잠시 뒤 다시 시도해 주세요.'); }
           },
         })),
-      }, '🎨 모습 바꾸기')));
+      }, ic('palette', { size: 18 }), ' 모습 바꾸기')));
 }

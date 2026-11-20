@@ -12,6 +12,18 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="추억저장소">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <script>
+    /* 첫 화면이 깜빡이지 않도록 저장된 꾸미기 설정을 먼저 적용 (자세한 처리는 js/theme.js) */
+    (function () {
+      try {
+        var s = JSON.parse(localStorage.getItem('pet-memories-settings') || '{}'), d = document.documentElement;
+        var dark = s.mode === 'dark' || (s.mode !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+        d.dataset.theme = dark ? 'dark' : 'light';
+        d.dataset.style = s.style === 'timeline' ? 'timeline' : 'card';
+        if (/^#[0-9a-f]{6}$/i.test(s.accent || '')) d.style.setProperty('--accent', s.accent);
+      } catch (e) { document.documentElement.dataset.theme = 'light'; }
+    })();
+  </script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>

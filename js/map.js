@@ -1,6 +1,7 @@
 // 동물병원 지도: Leaflet(지도 화면) + OpenStreetMap(지도 이미지) + 공공데이터(data/hospitals.json)
 // 지도 라이브러리는 지도 탭을 처음 열 때만 불러온다 (앱 시작을 느리게 하지 않기 위해).
 import { h } from './util.js';
+import { iconEl as ic } from './icons.js';
 
 const url = path => new URL('../' + path, import.meta.url).href;
 const KOREA = { center: [36.35, 127.8], zoom: 7 };
@@ -62,8 +63,8 @@ function popupNode(d) {
     h('strong', {}, d.n),
     h('span', {}, d.a || '주소 정보 없음'),
     h('div', { class: 'hos-actions' },
-      phone && h('a', { class: 'btn small primary', href: `tel:${phone}` }, '📞 전화'),
-      h('a', { class: 'btn small soft', href: nav, target: '_blank', rel: 'noopener' }, '🧭 길 안내')));
+      phone && h('a', { class: 'btn small primary', href: `tel:${phone}` }, ic('phone', { size: 16 }), '전화'),
+      h('a', { class: 'btn small soft', href: nav, target: '_blank', rel: 'noopener' }, ic('navigation', { size: 16 }), '길 안내')));
 }
 
 export function renderMapTab(toast) {
@@ -76,9 +77,9 @@ export function renderMapTab(toast) {
     class: 'input', type: 'search', placeholder: '병원 이름이나 동네로 찾기 (예: 강남)',
     'aria-label': '병원 찾기', autocomplete: 'off',
   });
-  const locBtn = h('button', { class: 'btn soft', type: 'button', disabled: true }, '📍 내 주변');
+  const locBtn = h('button', { class: 'btn soft', type: 'button', disabled: true }, ic('locate-fixed', { size: 18 }), '내 주변');
   const results = h('div', { class: 'map-results', role: 'list' });
-  const root = h('div', { class: 'mapview' },
+  const root = h('div', { class: 'page mapview' },
     h('section', { class: 'card map-tools' }, h('div', { class: 'map-search' }, input, locBtn), results),
     mapEl, status,
     h('p', { class: 'map-note' },
@@ -153,16 +154,16 @@ export function renderMapTab(toast) {
     locBtn.addEventListener('click', () => {
       if (!navigator.geolocation) { toast('이 브라우저에서는 내 위치를 쓸 수 없어요.'); return; }
       locBtn.disabled = true;
-      locBtn.textContent = '위치 찾는 중…';
+      locBtn.replaceChildren('위치 찾는 중…');
       navigator.geolocation.getCurrentPosition(pos => {
-        locBtn.disabled = false; locBtn.textContent = '📍 내 주변';
+        locBtn.disabled = false; locBtn.replaceChildren(ic('locate-fixed', { size: 18 }), '내 주변');
         if (myGen !== generation || !map) return;
         const ll = [pos.coords.latitude, pos.coords.longitude];
         if (here) here.remove();
         here = L.circleMarker(ll, { radius: 9, color: '#fff', weight: 3, fillColor: '#3b78d8', fillOpacity: 1 }).addTo(map);
         map.setView(ll, 14);
       }, err => {
-        locBtn.disabled = false; locBtn.textContent = '📍 내 주변';
+        locBtn.disabled = false; locBtn.replaceChildren(ic('locate-fixed', { size: 18 }), '내 주변');
         toast(err && err.code === 1
           ? '위치 사용이 꺼져 있어요. 폰 설정에서 이 사이트의 위치를 허용해 주세요.'
           : '내 위치를 찾지 못했어요. 잠시 뒤 다시 시도해 주세요.');
