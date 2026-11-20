@@ -1,9 +1,9 @@
 // IndexedDB 저장소: 모든 기록은 사용자 폰(브라우저) 안에만 저장된다.
 const DB_NAME = 'pet-memories';
-const DB_VERSION = 2;
-export const STORES = ['pets', 'posts', 'events', 'meta'];
+const DB_VERSION = 3;
+export const STORES = ['pets', 'posts', 'events', 'characters', 'meta'];
 // 백업에 포함할 저장소 (기능이 늘어나면 여기에 추가)
-export const BACKUP_STORES = ['pets', 'posts', 'events'];
+export const BACKUP_STORES = ['pets', 'posts', 'events', 'characters'];
 
 let dbPromise;
 function open() {
@@ -19,6 +19,7 @@ function open() {
         db.createObjectStore('meta', { keyPath: 'key' });
       }
       if (e.oldVersion < 2) db.createObjectStore('events', { keyPath: 'id' });
+      if (e.oldVersion < 3) db.createObjectStore('characters', { keyPath: 'id' }); // id = 반려동물 id
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -63,8 +64,9 @@ export async function remove(store, id) {
 // 반려동물과 그 아이의 추억·일정을 한 번에 삭제
 export async function removePetWithPosts(petId) {
   const db = await open();
-  const tx = db.transaction(['pets', 'posts', 'events'], 'readwrite');
+  const tx = db.transaction(['pets', 'posts', 'events', 'characters'], 'readwrite');
   tx.objectStore('pets').delete(petId);
+  tx.objectStore('characters').delete(petId);
   for (const name of ['posts', 'events']) {
     const cur = tx.objectStore(name).openCursor();
     cur.onsuccess = () => {

@@ -37,7 +37,7 @@ export async function createBackupFile() {
     data[name] = await Promise.all((await getAll(name)).map(serializeRow));
   }
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  return { blob, name: backupFileName(), counts: { pets: data.pets.length, posts: data.posts.length, events: data.events.length } };
+  return { blob, name: backupFileName(), counts: { pets: data.pets.length, posts: data.posts.length, events: data.events.length, characters: data.characters.length } };
 }
 
 export async function downloadBackup() {
@@ -84,5 +84,16 @@ export async function parseBackup(text) {
     if (e.petId != null && !petIds.has(e.petId)) continue; // 없는 아이의 일정은 건너뜀
     events.push(await reviveRow(e));
   }
-  return { pets, posts, events };
+  // 캐릭터도 예전 백업에는 없을 수 있다
+  const rawChars = data.characters === undefined ? [] : data.characters;
+  if (!Array.isArray(rawChars)) throw new Error('bad-file');
+  const characters = [];
+  for (const c of rawChars) {
+    if (!c || typeof c.id !== 'string' || !['dog', 'cat'].includes(c.kind) || !['straight', 'curly'].includes(c.fur) ||
+        !['black', 'white', 'brown', 'yellow', 'gray'].includes(c.color) ||
+        ![c.full, c.happy, c.clean, c.at].every(Number.isFinite)) throw new Error('bad-file');
+    if (!petIds.has(c.id)) continue;
+    characters.push(c);
+  }
+  return { pets, posts, events, characters };
 }

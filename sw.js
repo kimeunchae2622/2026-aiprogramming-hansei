@@ -1,9 +1,9 @@
 // 앱을 오프라인에서도 열 수 있게 하는 서비스 워커.
 // 네트워크가 되면 항상 최신 파일을 받고, 안 되면 저장해 둔 파일을 쓴다.
-const CACHE = 'pet-memories-v1';
+const CACHE = 'pet-memories-v2';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest', 'icon.svg',
-  'js/app.js', 'js/db.js', 'js/util.js', 'js/backup.js',
+  'js/app.js', 'js/db.js', 'js/util.js', 'js/backup.js', 'js/map.js', 'js/care.js', 'js/character.js',
 ];
 
 self.addEventListener('install', e => {

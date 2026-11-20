@@ -2,6 +2,7 @@ import * as db from './db.js';
 import { h, uid, compressImage, formatTime, ymd, parseYmd, isLeap, formatClock, WEEKDAYS } from './util.js';
 import { downloadBackup, parseBackup } from './backup.js';
 import { renderMapTab, destroyMap } from './map.js';
+import { renderCareTab } from './care.js';
 
 const SPECIES = {
   dog: { label: '강아지', emoji: '🐶' },
@@ -22,12 +23,13 @@ const EVENT_TYPES = {
 const TABS = [
   { id: 'feed', label: '추억', icon: '📖' },
   { id: 'calendar', label: '달력', icon: '📅' },
+  { id: 'care', label: '돌보기', icon: '🐾' },
   { id: 'map', label: '지도', icon: '🗺️' },
   { id: 'more', label: '더보기', icon: '⚙️' },
 ];
 
 const state = {
-  pets: [], posts: [], events: [], filter: 'all',
+  pets: [], posts: [], events: [], characters: [], carePet: null, filter: 'all',
   calMonth: { y: new Date().getFullYear(), m: new Date().getMonth() }, calSel: ymd(new Date()), tab: 'feed',
   shown: PAGE_SIZE, lastBackup: undefined, lastPet: null, bannerHidden: false,
 };
@@ -38,12 +40,13 @@ const $ = sel => document.querySelector(sel);
 
 /* ---------- 데이터 불러오기 ---------- */
 async function load() {
-  const [pets, posts, events, lastBackup] = await Promise.all([
-    db.getAll('pets'), db.getAll('posts'), db.getAll('events'), db.getMeta('lastBackup'),
+  const [pets, posts, events, characters, lastBackup] = await Promise.all([
+    db.getAll('pets'), db.getAll('posts'), db.getAll('events'), db.getAll('characters'), db.getMeta('lastBackup'),
   ]);
   state.pets = pets.sort((a, b) => a.createdAt - b.createdAt);
   state.posts = posts.sort((a, b) => b.createdAt - a.createdAt);
   state.events = events;
+  state.characters = characters;
   state.lastBackup = lastBackup;
   if (state.filter !== 'all' && !state.pets.some(p => p.id === state.filter)) state.filter = 'all';
 }
@@ -536,6 +539,8 @@ function renderMore() {
 }
 
 /* ---------- 전체 그리기 ---------- */
+const careCtx = { state, toast, openSheet, avatar, render: () => render(), reload: () => reload() };
+
 function render() {
   urls.forEach(u => URL.revokeObjectURL(u));
   urls = [];
@@ -552,7 +557,7 @@ function render() {
 
   root.append(...[
     h('header', { class: 'topbar' }, h('h1', {}, '🐾 추억 저장소')),
-    h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, map: () => renderMapTab(toast), more: renderMore })[state.tab]()),
+    h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, care: () => renderCareTab(careCtx), map: () => renderMapTab(toast), more: renderMore })[state.tab]()),
     state.tab === 'feed' && h('button', { class: 'fab', onclick: () => openCompose() }, '✏️ 글쓰기'),
     tabBar].filter(Boolean));
 }
@@ -756,7 +761,10 @@ function refreshTimes() {
   });
 }
 setInterval(refreshTimes, 30000);
-document.addEventListener('visibilitychange', refreshTimes); // 앱으로 돌아오면 바로 갱신
+document.addEventListener('visibilitychange', () => {
+  refreshTimes(); // 앱으로 돌아오면 바로 갱신
+  if (!document.hidden && state.tab === 'care' && state.pets.length) render(); // 그동안 줄어든 수치 반영
+});
 
 /* ---------- 시작 ---------- */
 async function start() {
