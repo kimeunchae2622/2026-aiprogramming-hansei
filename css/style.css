@@ -528,3 +528,11 @@ a { color: inherit; }
 .bar i[data-k="happy"] { background: #ff6f91; }
 .bar i[data-k="clean"] { background: #4fb3f6; }
 .bar i.low { background: var(--danger) !important; }
+
+/* 이웃(다른 반려동물) */
+.room-pet.room-neighbor { width: 30%; bottom: 7%; z-index: 4; }
+.room-neighbor .pet-hit { position: relative; }
+.nb-name { position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%); background: rgba(255, 255, 255, .85); color: #3a2b20; font-size: .68rem; font-weight: 800; padding: 1px 8px; border-radius: 999px; white-space: nowrap; pointer-events: none; }
+.nb-bubble { position: absolute; left: 50%; bottom: 96%; transform: translate(-50%, 4px); background: #fff; color: #3a2b20; font-weight: 800; font-size: .74rem; padding: 4px 10px; border-radius: 12px; white-space: nowrap; box-shadow: 0 3px 10px rgba(60, 35, 10, .2); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 3; }
+.nb-bubble.show { opacity: 1; transform: translate(-50%, 0); }
+.neighbor-tip { font-size: .85rem; text-align: center; }

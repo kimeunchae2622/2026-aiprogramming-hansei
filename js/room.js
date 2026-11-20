@@ -294,6 +294,74 @@ export function createRoom(opts = {}) {
     }),
   };
 
+  /* ---------- 이웃(= 사용자가 키우는 다른 반려동물)이 놀러 오기 ---------- */
+  const neighbors = [];
+  const greetings = ['안녕!', '같이 놀자!', '놀러 왔어요~', '여기 아늑하다!', '냄새 좋아요'];
+
+  function addNeighbor({ name, ch, stats }, onVisit, mainName) {
+    const holder = h('div', { class: 'pet-svg' });
+    const nbBubble = h('div', { class: 'nb-bubble' });
+    const tag = h('span', { class: 'nb-name' }, name);
+    const hit = h('button', { class: 'pet-hit', type: 'button', 'aria-label': `${name}의 집에 놀러 가기`, onclick: () => onVisit(ch.id) },
+      h('div', { class: 'pet-inner' }, holder), tag);
+    const node = h('div', { class: 'room-pet room-neighbor', style: `left:${rand(18, 82)}%` }, nbBubble, hit);
+    const n = { node, holder, nbBubble, x: parseFloat(node.style.left), ch, stats, name };
+    const paint = () => {
+      const asleep = el.dataset.phase === 'night';
+      holder.innerHTML = characterSvg({ kind: ch.kind, fur: ch.fur, color: ch.color, mood: asleep ? 'sleep' : 'normal', outfit: ch.outfit || {} });
+      node.classList.toggle('sleeping', asleep);
+    };
+    n.paint = paint;
+    paint();
+    el.insertBefore(node, night);
+    neighbors.push(n);
+
+    const walk = async x => {
+      const dx = x - n.x;
+      if (Math.abs(dx) < 1) return;
+      const d = 600 + Math.abs(dx) * 42;
+      node.classList.toggle('dir-left', dx < 0);
+      node.classList.add('walking');
+      node.style.transition = `left ${d}ms ease-in-out`;
+      node.style.left = x + '%';
+      n.x = x;
+      await sleep(d);
+      node.classList.remove('walking');
+    };
+    const nbSay = text => {
+      nbBubble.textContent = text;
+      nbBubble.classList.add('show');
+      later(() => { if (nbBubble.textContent === text) nbBubble.classList.remove('show'); }, 2600);
+    };
+
+    (async () => {
+      await sleep(rand(1500, 4000));
+      while (alive) {
+        await sleep(rand(5000, 11000));
+        if (!alive) return;
+        if (busy || document.hidden) continue;
+        if (el.dataset.phase === 'night') { if (!node.classList.contains('sleeping')) paint(); continue; }
+        if (node.classList.contains('sleeping')) paint();
+        if (Math.random() < 0.45) { // 주인공 캐릭터에게 인사하러 가기
+          const side = px > 50 ? -1 : 1;
+          await walk(Math.max(14, Math.min(86, px + side * 20)));
+          if (!alive) return;
+          nbSay(`${mainName}, ${greetings[Math.floor(Math.random() * greetings.length)]}`);
+          hearts(2);
+          await sleep(1800);
+        } else {
+          await walk(rand(14, 86));
+        }
+      }
+    })();
+  }
+
+  function setNeighbors(list, onVisit, mainName) {
+    neighbors.forEach(n => n.node.remove());
+    neighbors.length = 0;
+    list.forEach(item => addNeighbor(item, onVisit, mainName));
+  }
+
   /* ---------- 공개 함수 ---------- */
   function update(ch, stats, moodName) {
     const firstDraw = !cur.ch;
@@ -309,7 +377,7 @@ export function createRoom(opts = {}) {
   wander();
 
   return {
-    el, update, say, coinFloat, hearts, sparkles, touch,
+    el, update, say, coinFloat, hearts, sparkles, touch, setNeighbors,
     actions,
     get busy() { return busy; },
     destroy() {

@@ -199,6 +199,15 @@ export function renderCareTab(ctx) {
 
   room = createRoom({ onPetTap: () => act('pet') });
   const roomEl = room.el;
+  // 이웃: 캐릭터를 만든 다른 반려동물들이 놀러 온다. 눌러서 그 아이 집으로 갈 수 있다.
+  const neighborList = state.pets.filter(p => p.id !== pet.id).map(p => {
+    const raw = state.characters.find(x => x.id === p.id);
+    if (!raw) return null;
+    const nch = normalizeChar(raw);
+    return { name: p.name, ch: nch, stats: currentStats(nch) };
+  }).filter(Boolean);
+  room.setNeighbors(neighborList, id => { state.carePet = id; ctx.render(); }, pet.name);
+  const othersWithoutChar = state.pets.filter(p => p.id !== pet.id && !state.characters.some(x => x.id === p.id));
 
   const buttons = [];
   const actionRow = h('div', { class: 'care-buttons' }, Object.entries(ACTIONS).map(([key, a]) => {
@@ -428,5 +437,6 @@ export function renderCareTab(ctx) {
 
   refresh();
   return h('div', { class: 'page care' }, chips,
-    h('section', { class: 'card home-card' }, roomEl, nameRow, bars, actionRow, tiles));
+    h('section', { class: 'card home-card' }, roomEl, nameRow, bars, actionRow, tiles,
+      othersWithoutChar.length ? h('p', { class: 'muted neighbor-tip' }, `${othersWithoutChar.map(p => p.name).join(', ')}의 캐릭터도 만들면 이웃으로 놀러 와요. 위에서 아이를 눌러 만들 수 있어요.`) : (neighborList.length ? h('p', { class: 'muted neighbor-tip' }, '이웃 아이를 누르면 그 아이의 집에 놀러 갈 수 있어요.') : null)));
 }
