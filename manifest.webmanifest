@@ -1,0 +1,9 @@
+{
+  "name": "반려동물 추억 저장소",
+  "short_name": "추억저장소",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff6ee",
+  "theme_color": "#ff9f68",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
