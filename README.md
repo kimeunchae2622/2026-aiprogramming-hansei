@@ -4,6 +4,7 @@
 
 - 주제: **반려동물 추억 저장소** (나만 보는 모바일 웹앱)
 - 형태: Windows 단독 실행형(.exe 1개) 또는 모바일 지원 웹(무료 서버)
+- 접속 주소: https://kimeunchae2622.github.io/2026-aiprogramming-hansei/
 - 상태: 기획 단계 (기획서: docs/project-plan.md)
 
 ## 조건 요약
