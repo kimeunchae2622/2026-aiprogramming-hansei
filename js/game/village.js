@@ -419,7 +419,7 @@ async function pickFurn(f) {
 
 /* ======================= 그리기 ======================= */
 function drawSpr(g, spr, x, y, scale = 1, flip = false) {
-  const w = spr.w * scale, hh = spr.h * scale, dx = Math.round(x - spr.ax * scale), dy = Math.round(y - spr.ay * scale);
+  const w = spr.w * scale, hh = spr.h * scale, dx = x - spr.ax * scale, dy = y - spr.ay * scale;
   if (!flip) g.drawImage(spr.cv, dx, dy, w, hh);
   else { g.save(); g.translate(dx + w, dy); g.scale(-1, 1); g.drawImage(spr.cv, 0, 0, w, hh); g.restore(); }
 }
@@ -435,9 +435,10 @@ function render() {
   const { world, cam, vw, vh } = G, g = G.g, sc = G.sc;
   g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#2d5a2a'; g.fillRect(0, 0, G.cv.width, G.cv.height);
   g.imageSmoothingEnabled = false;
-  const cx = Math.round(cam.x), cy = Math.round(cam.y);
-  g.setTransform(sc, 0, 0, sc, -cx * sc, -cy * sc);
-  g.drawImage(world.ground, cx, cy, vw, vh, cx, cy, vw, vh);
+  const ox = Math.round(cam.x * sc), oy = Math.round(cam.y * sc), cx = ox / sc, cy = oy / sc; // 카메라는 장치 픽셀 단위로만 반올림
+  g.setTransform(sc, 0, 0, sc, -ox, -oy);
+  const gx = Math.floor(cx), gy = Math.floor(cy);
+  g.drawImage(world.ground, gx, gy, vw + 2, vh + 2, gx, gy, vw + 2, vh + 2);
   // 물 반짝임
   g.fillStyle = '#ffffff';
   for (const [x, y, ph] of world.waterPts) { if (x < cx - 4 || x > cx + vw + 4 || y < cy - 4 || y > cy + vh + 4) continue; const a = Math.sin(G.t * 1.6 + ph); if (a > .72) { g.globalAlpha = (a - .72) * 3; g.fillRect(x, y, 3, 1); g.fillRect(x + 1, y - 1, 1, 1); } }
@@ -471,7 +472,7 @@ function render() {
   if (night > 0) {
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.fillStyle = `rgba(16,24,70,${.5 * night})`; g.fillRect(0, 0, G.cv.width, G.cv.height);
-    g.setTransform(sc, 0, 0, sc, -cx * sc, -cy * sc);
+    g.setTransform(sc, 0, 0, sc, -ox, -oy);
     g.globalCompositeOperation = 'lighter';
     for (const l of [...world.lamps, ...world.glows]) { if (l.x < cx - 60 || l.x > cx + vw + 60 || l.y < cy - 60 || l.y > cy + vh + 60) continue; const gr = g.createRadialGradient(l.x, l.y, 0, l.x, l.y, l.r); gr.addColorStop(0, `rgba(255,205,110,${.55 * night})`); gr.addColorStop(1, 'rgba(255,205,110,0)'); g.fillStyle = gr; g.fillRect(l.x - l.r, l.y - l.r, l.r * 2, l.r * 2); }
     g.globalCompositeOperation = 'source-over';
@@ -507,7 +508,7 @@ function frame(ts) {
     updatePlayer(dt); updatePets(dt); updateParticles(dt);
     // 카메라
     const tx = clamp(G.player.x - G.vw / 2, 0, GW - G.vw), ty = clamp(G.player.y - G.vh * .58, 0, GH - G.vh);
-    const k = 1 - Math.exp(-9 * dt); G.cam.x += (tx - G.cam.x) * k; G.cam.y += (ty - G.cam.y) * k;
+    G.cam.x = tx; G.cam.y = ty;
     // 구역 이름
     const z = zoneAt(G.player.x, G.player.y);
     if (z && z.id !== G.zoneId) { G.zoneId = z.id; showZone(z.name); }
