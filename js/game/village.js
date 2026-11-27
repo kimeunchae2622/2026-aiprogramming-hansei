@@ -227,7 +227,7 @@ function updatePlayer(dt) {
     const mx = vx * sp * dt, my = vy * sp * dt;
     const ok = tryMove(p, mx, my, 5, 4);
     p.dir = dirOf(vx, vy, p.dir);
-    if (ok) p.t += dt; else p.t += dt * .3;
+    if (ok) { p.t += dt; p.dust = (p.dust || 0) - dt; if (p.dust <= 0) { p.dust = .22; G.particles.push({ kind: 'dust', x: p.x + (Math.random() - .5) * 4, y: p.y - 1, vy: -3, vx: -vx * 6, life: .5, age: 0 }); } } else p.t += dt * .3;
   } else p.t = 0;
 }
 
@@ -441,8 +441,8 @@ function render() {
   for (const s of world.spots) { if (s.x < cx - 20 || s.x > cx + vw + 20 || s.y < cy - 10 || s.y > cy + vh + 30) continue; const act = spotActive(s), spr = act ? s.sprites.full : s.sprites.empty; list.push({ sy: s.y, f: () => { drawSpr(g, spr, s.x, s.y); if (act) { const a = (Math.sin(G.t * 3 + s.x) + 1) / 2; if (a > .5) drawSpr(g, sparkSpr(), s.x + 8, s.y - 18 - a * 2); } } }); }
   for (const f of G.save.placed) { const def = FURN[f.type], spr = def.spr(), x = (f.tx + def.w / 2) * TS, y = (f.ty + 1) * TS - 2; list.push({ sy: y, f: () => drawSpr(g, f.type === 'bench' ? spr : spr, x, y) }); }
   const pl = G.player;
-  list.push({ sy: pl.y, f: () => { const fr = pl.moving ? [1, 0, 2, 0][Math.floor(pl.t / .13) % 4] : 0; shadow(g, pl.x, pl.y, 8); drawSpr(g, playerFrame(pl.dir, fr), pl.x, pl.y, CHAR_SCALE, pl.dir === 'right'); } });
-  for (const pet of G.pets) list.push({ sy: pet.y, f: () => { const pose = pet.state === 'rest' ? 'rest' : pet.state === 'happy' ? 'happy' : pet.moving ? (Math.floor(pet.anim / .18) % 2 ? 'walk1' : 'walk2') : 'stand'; const d = pet.state === 'rest' ? (pet.dir === 'right' ? 'right' : 'left') : pet.dir; shadow(g, pet.x, pet.y, pet.state === 'rest' ? 10 : 8); const bounce = pet.state === 'happy' ? -Math.abs(Math.sin(pet.anim * 9)) * 3 : 0; drawSpr(g, petFrame(pet.look.kind, pet.look.color, pet.look.fur, d, pose), pet.x, pet.y + bounce, CHAR_SCALE, d === 'right'); } });
+  list.push({ sy: pl.y, f: () => { const fr = pl.moving ? [1, 0, 2, 0][Math.floor(pl.t / .13) % 4] : 0; const br = pl.moving ? 0 : (Math.sin(G.t * 2.3) > .55 ? -1 : 0); shadow(g, pl.x, pl.y, 8); drawSpr(g, playerFrame(pl.dir, fr), pl.x, pl.y + br, CHAR_SCALE, pl.dir === 'right'); } });
+  for (const pet of G.pets) list.push({ sy: pet.y, f: () => { const pose = pet.state === 'rest' ? 'rest' : pet.state === 'happy' ? 'happy' : pet.moving ? (Math.floor(pet.anim / .18) % 2 ? 'walk1' : 'walk2') : 'stand'; const d = pet.state === 'rest' ? (pet.dir === 'right' ? 'right' : 'left') : pet.dir; shadow(g, pet.x, pet.y, pet.state === 'rest' ? 10 : 8); const bounce = pet.state === 'happy' ? -Math.abs(Math.sin(pet.anim * 9)) * 3 : (!pet.moving && pet.state !== 'rest' && Math.sin(G.t * 2.6 + pet.speed) > .5 ? -1 : 0); drawSpr(g, petFrame(pet.look.kind, pet.look.color, pet.look.fur, d, pose), pet.x, pet.y + bounce, CHAR_SCALE, d === 'right'); } });
   list.sort((a, b) => a.sy - b.sy);
   for (const it of list) it.f();
   // 놓기 미리보기
@@ -456,7 +456,7 @@ function render() {
   for (const p of G.petals || []) { g.globalAlpha = Math.min(1, (p.life - p.age) * 1.2); g.fillStyle = p.c; g.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); g.fillRect(Math.round(p.x) + 1, Math.round(p.y) + 1, 1, 1); }
   g.globalAlpha = 1;
   // 효과 (하트·반짝임·글자)
-  for (const p of G.particles) { if (p.age < 0) continue; g.globalAlpha = Math.min(1, (p.life - p.age) * 2); if (p.kind === 'heart') drawSpr(g, heartSpr(), p.x, p.y); else if (p.kind === 'spark') drawSpr(g, sparkSpr(), p.x, p.y); }
+  for (const p of G.particles) { if (p.age < 0) continue; g.globalAlpha = Math.min(1, (p.life - p.age) * 2); if (p.kind === 'heart') drawSpr(g, heartSpr(), p.x, p.y); else if (p.kind === 'spark') drawSpr(g, sparkSpr(), p.x, p.y); else if (p.kind === 'dust') { g.globalAlpha *= .5; g.fillStyle = '#f3ead2'; const sz = 2 + Math.floor(p.age * 4); g.fillRect(Math.round(p.x - sz / 2), Math.round(p.y - sz / 2), sz, sz - 1); } }
   g.globalAlpha = 1;
   // 밤 / 저녁 색감 + 등불
   const night = nightAmount();
