@@ -242,7 +242,7 @@ export function buildWorld() {
   const house = add(P.house(), 17.5, 47, { col: [-46, -22, 46, 0], kind: 'house' });
   world.smoke.push({ x: house.x + 30, y: house.y - 90 });
   world.glows.push({ x: house.x - 38, y: house.y - 32, r: 26 }, { x: house.x + 28, y: house.y - 32, r: 26 });
-  world.interacts.push({ id: 'home-door', kind: 'home', x: T(17.5), y: T(47.8), r: 26, label: '집에 들어가기' });
+  world.interacts.push({ id: 'home-door', kind: 'wip', x: T(17.5), y: T(47.8), r: 26, label: '우리 집', text: '집 안은 준비 중이에요. 정원에서 마음껏 놀아요!' });
   tree('cherry', 9.5, 44, 1); tree('cherryS', 27.5, 42.6, 2); tree('big', 8, 58, 3); tree('treeS', 30, 58, 4);
   add(P.bench(), 24.2, 45.2, { col: [-13, -6, 13, 0] }); add(P.pot(2), 12.2, 47.4, { col: [-5, -4, 5, 0] }); add(P.pot(3), 22.8, 47.4, { col: [-5, -4, 5, 0] });
   add(P.doghouse(), 10.5, 50.2, { col: [-18, -10, 18, 0] }); add(P.mailbox(), 30.2, 49.6, { col: [-4, -5, 4, 0] });

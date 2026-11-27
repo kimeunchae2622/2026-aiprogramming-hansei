@@ -123,3 +123,10 @@
 .vg-chip { display: inline-flex; align-items: center; gap: calc(5 * var(--a)); padding: calc(4 * var(--a)) calc(10 * var(--a)); border: calc(2 * var(--a)) solid #d6b57c; border-radius: 999px; background: #fff7df; color: #5a3a1e; font-weight: 800; font-size: calc(12 * var(--a)); cursor: pointer; }
 .vg-chip i { width: calc(14 * var(--a)); height: calc(14 * var(--a)); border-radius: 50%; border: calc(1.5 * var(--a)) solid rgba(0, 0, 0, .25); }
 .vg-chip.on { border-color: #e8643a; background: #ffe9c2; }
+
+.vg-creator { display: flex; flex-direction: column; gap: calc(8 * var(--a)); }
+.vg-step { display: flex; justify-content: space-between; align-items: center; font-size: calc(12 * var(--a)); color: #8a6238; } .vg-step b { color: #5a3a1e; font-size: calc(14 * var(--a)); }
+.vg-prev { display: flex; justify-content: center; align-items: flex-end; gap: calc(10 * var(--a)); padding: calc(8 * var(--a)); background: linear-gradient(#bfe6a0, #9bd070); border-radius: calc(12 * var(--a)); border: calc(2 * var(--a)) solid #a8703c; }
+.vg-prev img { image-rendering: pixelated; height: calc(66 * var(--a)); width: auto; }
+.vg-rows { display: flex; flex-direction: column; gap: calc(6 * var(--a)); }
+.vg-nav { display: flex; gap: calc(8 * var(--a)); justify-content: flex-end; position: sticky; bottom: 0; padding-top: calc(4 * var(--a)); } .vg-nav .vg-btn.big { flex: 1; }

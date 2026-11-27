@@ -25,15 +25,29 @@ const BASE = {
 let C = BASE; // 그리는 동안만 외형 설정으로 바뀐다
 const P_W = 52, P_H = 72, P_AX = 26, P_AY = 66;
 
-// 주인공 외형 선택지 (나중에 피부색·의상·액세서리를 같은 방식으로 늘릴 수 있다)
+// 주인공 외형 선택지 (나중에 의상·액세서리를 같은 방식으로 늘릴 수 있다)
 export const LOOKS = {
-  hair: { brown: { name: '밤색', hair: '#8c5232', hairD: '#5f3520', hairL: '#b87a4a' }, black: { name: '검정', hair: '#3b3340', hairD: '#241d29', hairL: '#6a5d78' }, blonde: { name: '금발', hair: '#d9a441', hairD: '#a8751f', hairL: '#f2cd7a' }, pink: { name: '분홍', hair: '#d9739c', hairD: '#a84a73', hairL: '#f2a3c0' } },
+  style: { short: { name: '짧은 머리' }, long: { name: '긴 머리' }, tied: { name: '묶은 머리' } },
+  hair: { black: { name: '검정', hair: '#3b3340', hairD: '#241d29', hairL: '#6a5d78' }, brown: { name: '갈색', hair: '#8c5232', hairD: '#5f3520', hairL: '#b87a4a' }, lightbrown: { name: '밝은 갈색', hair: '#b98350', hairD: '#8a5a30', hairL: '#dcae7c' }, blonde: { name: '금발', hair: '#d9a441', hairD: '#a8751f', hairL: '#f2cd7a' } },
+  skin: { fair: { name: '하얀', skin: '#ffe9d6', skinD: '#f1c9aa' }, light: { name: '밝은', skin: '#ffe1c2', skinD: '#efb994' }, tan: { name: '구릿빛', skin: '#e8b88a', skinD: '#c98f62' }, deep: { name: '짙은', skin: '#b9774f', skinD: '#965a37' } },
+  glasses: { none: { name: '없음' }, round: { name: '둥근 안경' }, horn: { name: '뿔테 안경' } },
+  gcolor: { black: { name: '검정', gl: '#2b2733' }, gray: { name: '회색', gl: '#8d939c' }, brown: { name: '갈색', gl: '#7a4a2b' } },
   dress: { pink: { name: '분홍', dress: '#e65b73', dressD: '#b9405a', dressL: '#f78ca1' }, blue: { name: '파랑', dress: '#4f8fe0', dressD: '#346cb8', dressL: '#86b6f2' }, green: { name: '초록', dress: '#4fae6a', dressD: '#358a4e', dressL: '#85d09b' }, yellow: { name: '노랑', dress: '#f0b429', dressD: '#c4881a', dressL: '#f8d36a' } },
-  skin: { light: { name: '밝은', skin: '#ffe1c2', skinD: '#efb994' }, tan: { name: '구릿빛', skin: '#e8b88a', skinD: '#c98f62' }, deep: { name: '짙은', skin: '#b9774f', skinD: '#965a37' } },
 };
-export const DEFAULT_LOOK = { hair: 'brown', dress: 'pink', skin: 'light' };
-const lookKey = l => `${l?.hair || 'brown'}-${l?.dress || 'pink'}-${l?.skin || 'light'}`;
-const palette = l => ({ ...BASE, ...(LOOKS.hair[l?.hair] || LOOKS.hair.brown), ...(LOOKS.dress[l?.dress] || LOOKS.dress.pink), ...(LOOKS.skin[l?.skin] || LOOKS.skin.light) });
+export const DEFAULT_LOOK = { style: 'long', hair: 'brown', skin: 'light', glasses: 'none', gcolor: 'black', dress: 'pink' };
+export const normLook = l => { const o = { ...DEFAULT_LOOK }; for (const k of Object.keys(DEFAULT_LOOK)) if (l && LOOKS[k] && LOOKS[k][l[k]]) o[k] = l[k]; return o; };
+const lookKey = l => { const n = normLook(l); return Object.keys(DEFAULT_LOOK).map(k => n[k]).join('-'); };
+const palette = l => { const n = normLook(l); return { ...BASE, ...LOOKS.hair[n.hair], ...LOOKS.dress[n.dress], ...LOOKS.skin[n.skin], gl: LOOKS.gcolor[n.gcolor].gl }; };
+function glassesFront(p, kind, y0) {
+  if (kind === 'none') return; const g = C.gl;
+  for (const x of [20, 32]) { if (kind === 'round') { p.disc(x, 34 + y0, 5.4, g); p.disc(x, 34 + y0, 3.9, C.skin); } else { p.rect(x - 5.5, 30 + y0, 11, 8, g); p.rect(x - 4, 31.5 + y0, 8, 5, C.skin); } }
+  p.rect(25, 33 + y0, 2, 1.5, g);
+}
+function glassesSide(p, kind, y0) {
+  if (kind === 'none') return; const g = C.gl;
+  if (kind === 'round') { p.disc(18, 34 + y0, 5.4, g); p.disc(18, 34 + y0, 3.9, C.skin); } else { p.rect(12.5, 30 + y0, 11, 8, g); p.rect(14, 31.5 + y0, 8, 5, C.skin); }
+  p.rect(23, 33 + y0, 9, 1.5, g);
+}
 
 function hairWaves(p, x0, x1, y, count, color) { // 머리끝 물결
   for (let i = 0; i < count; i++) p.disc(x0 + (x1 - x0) * i / (count - 1), y + (i % 2) * 2, 3.2, color);
@@ -72,6 +86,7 @@ function flowersAt(p, x, y) {
 
 function player(dir, frame, look) {
   C = palette(look);
+  const { style: hs, glasses: gl } = normLook(look);
   const p = new Pix(P_W, P_H);
   const walk = frame === 1 || frame === 2;
   const bob = walk ? -1 : 0;
@@ -96,8 +111,7 @@ function player(dir, frame, look) {
 
   const y0 = bob;
   if (dir === 'down') {
-    p.ell(26, 38 + y0, 16.5, 16, C.hair);
-    hairWaves(p, 11, 41, 52 + y0, 6, C.hair);
+    if (hs === 'long') { p.ell(26, 38 + y0, 16.5, 16, C.hair); hairWaves(p, 11, 41, 52 + y0, 6, C.hair); } else { p.ell(26, 31 + y0, 15, 10, C.hair); if (hs === 'tied') { p.ell(8, 43 + y0, 4.2, 8, C.hair); p.ell(44, 43 + y0, 4.2, 8, C.hair); p.disc(9, 35 + y0, 2.4, C.rib); p.disc(43, 35 + y0, 2.4, C.rib); } }
     boots();
     // 원피스 + 앞치마
     p.poly([[18, 40 + y0], [34, 40 + y0], [38, 47 + y0], [43, 60], [9, 60], [14, 47 + y0]], C.dress);
@@ -116,6 +130,7 @@ function player(dir, frame, look) {
     // 얼굴
     p.ell(26, 33 + y0, 13.4, 11.6, C.skinD); p.ell(26, 32 + y0, 13, 11.2, C.skin);
     p.ell(18, 37 + y0, 3.2, 1.9, C.blush); p.ell(34, 37 + y0, 3.2, 1.9, C.blush);
+    glassesFront(p, gl, y0);
     for (const x of [20, 32]) {
       p.ell(x, 34 + y0, 2.5, 3.6, C.eye); p.ell(x, 35 + y0, 1.5, 2.2, C.iris);
       p.rect(x - 2, 32 + y0, 2, 2, '#fff'); p.set(x + 1, 36 + y0, '#fff');
@@ -125,14 +140,12 @@ function player(dir, frame, look) {
     // 앞머리와 옆머리
     p.ell(26, 24 + y0, 15, 7, C.hair);
     p.poly([[12, 25 + y0], [21, 33 + y0], [25, 25 + y0]], C.hair); p.poly([[22, 25 + y0], [28, 31 + y0], [32, 25 + y0]], C.hair); p.poly([[29, 25 + y0], [39, 33 + y0], [41, 25 + y0]], C.hair);
-    p.rect(11, 25 + y0, 4, 22, C.hair); p.rect(37, 25 + y0, 4, 22, C.hair);
-    for (const [x1, y1, x2, y2] of [[16, 23, 14, 34], [23, 22, 21, 30], [34, 23, 36, 33], [13, 36, 13, 46], [39, 36, 39, 46]]) p.line(x1, y1 + y0, x2, y2 + y0, C.hairL);
+    const sl = hs === 'long' ? 22 : hs === 'tied' ? 11 : 9; p.rect(11, 25 + y0, 4, sl, C.hair); p.rect(37, 25 + y0, 4, sl, C.hair);
+    for (const [x1, y1, x2, y2] of [[16, 23, 14, 34], [23, 22, 21, 30], [34, 23, 36, 33], ...(hs === 'long' ? [[13, 36, 13, 46], [39, 36, 39, 46]] : [])]) p.line(x1, y1 + y0, x2, y2 + y0, C.hairL);
     hatBlock(p, 26, 19 + y0);
     bowAt(p, 12, 18 + y0, .8); flowersAt(p, 10, 12 + y0);
   } else if (dir === 'up') {
-    p.ell(26, 38 + y0, 17, 19, C.hair);
-    hairWaves(p, 11, 41, 55 + y0, 6, C.hair);
-    for (const [x1, y1, x2, y2] of [[18, 30, 17, 52], [26, 28, 26, 54], [34, 30, 35, 52]]) p.line(x1, y1 + y0, x2, y2 + y0, C.hairL);
+    if (hs === 'long') { p.ell(26, 38 + y0, 17, 19, C.hair); hairWaves(p, 11, 41, 55 + y0, 6, C.hair); for (const [x1, y1, x2, y2] of [[18, 30, 17, 52], [26, 28, 26, 54], [34, 30, 35, 52]]) p.line(x1, y1 + y0, x2, y2 + y0, C.hairL); } else { p.ell(26, 31 + y0, 16, 12, C.hair); if (hs === 'tied') { p.ell(12, 44 + y0, 4.4, 9, C.hair); p.ell(40, 44 + y0, 4.4, 9, C.hair); p.disc(12, 35 + y0, 2.4, C.rib); p.disc(40, 35 + y0, 2.4, C.rib); } }
     boots();
     p.poly([[18, 41 + y0], [34, 41 + y0], [38, 48 + y0], [43, 60], [9, 60], [14, 48 + y0]], C.dress);
     p.rect(9, 57, 34, 3, C.dressD); for (let x = 10; x < 43; x += 3) p.disc(x, 61, 1.9, C.white);
@@ -142,9 +155,8 @@ function player(dir, frame, look) {
     hatBlock(p, 26, 19 + y0);
     bowAt(p, 26, 22 + y0, 1.5); flowersAt(p, 40, 12 + y0);
   } else { // left
-    p.ell(34, 38 + y0, 8.5, 17, C.hair); p.ell(32, 30 + y0, 11, 11, C.hair);
-    hairWaves(p, 27, 40, 52 + y0, 4, C.hair);
-    p.line(33, 30 + y0, 35, 50 + y0, C.hairL);
+    p.ell(32, 30 + y0, 11, 11, C.hair);
+    if (hs === 'long') { p.ell(34, 38 + y0, 8.5, 17, C.hair); hairWaves(p, 27, 40, 52 + y0, 4, C.hair); p.line(33, 30 + y0, 35, 50 + y0, C.hairL); } else if (hs === 'tied') { p.ell(40, 40 + y0, 4.6, 9, C.hair); p.disc(39, 32 + y0, 2.4, C.rib); }
     boots(true);
     p.poly([[19, 41 + y0], [32, 41 + y0], [38, 60], [14, 60]], C.dress);
     p.poly([[21, 43 + y0], [31, 43 + y0], [35, 59], [17, 59]], C.dressL);
@@ -157,6 +169,7 @@ function player(dir, frame, look) {
     p.ell(24, 33 + y0, 12, 11.4, C.skinD); p.ell(24, 32 + y0, 11.6, 11, C.skin);
     p.disc(12, 35 + y0, 1.4, C.skinD);
     p.ell(16, 37 + y0, 3, 1.8, C.blush);
+    glassesSide(p, gl, y0);
     p.ell(18, 34 + y0, 2.3, 3.5, C.eye); p.ell(18, 35 + y0, 1.4, 2.1, C.iris); p.rect(16.5, 32 + y0, 2, 2, '#fff'); p.set(19, 36 + y0, '#fff');
     p.line(15, 30 + y0, 20, 29 + y0, C.hairD);
     p.line(14, 40 + y0, 17, 40 + y0, '#c9605e');
@@ -181,42 +194,76 @@ export const FUR = {
 const EAR_IN = '#f5a9a9', NOSE = '#2e1e22', COLLAR = '#d94b4b', BELL = '#ffd24a', EYE = '#241512';
 const PW = 64, PH = 52, PAX = 32, PAY = 47;
 
-function eyeAt(p, x, y, ink, happy = false) {
-  if (happy) { p.line(x - 3, y + 1, x - 1, y - 1, '#2a1c18', 1); p.line(x - 1, y - 1, x + 1, y - 1, '#2a1c18', 1); p.line(x + 1, y - 1, x + 3, y + 1, '#2a1c18', 1); return; }
-  p.ell(x, y, 2.4, 3, EYE); p.rect(x - 1.6, y - 2, 1.8, 1.8, '#fff'); p.set(x + 1, y + 1.4, '#ffffff'); p.set(x, y + 2, '#6a4a3a');
+/* ---------- 반려동물 외형 선택지 (게임 안에서만 쓰는 모습. 앱의 반려동물 정보는 건드리지 않는다) ---------- */
+const NOSES = { black: '#2e1e22', brown: '#6b4030', pink: '#f08a94' };
+const IRIS = { dark: null, brown: '#8a5a34', blue: '#5aa9ff', green: '#5ec27a' };
+export const PET_OPTS = {
+  kind: { dog: '강아지', cat: '고양이' },
+  color: { black: '검정', white: '하양', brown: '갈색', yellow: '황색', gray: '회색' },
+  coat: { short: '짧은 털', long: '긴 털' },
+  fur: { straight: '직모', curly: '곱슬' },
+  pattern: { plain: '무늬 없음', stripes: '줄무늬', spots: '점무늬' },
+  eye: { dark: '검은 눈', brown: '갈색 눈', blue: '파란 눈', green: '초록 눈' },
+  nose: { black: '검정 코', brown: '갈색 코', pink: '분홍 코' },
+  ear: { up: '쫑긋한 귀', down: '처진 귀' },
+  tail: { short: '짧은 꼬리', long: '긴 꼬리' },
+  acc: { none: '장식 없음', collar: '목걸이', ribbon: '리본', scarf: '스카프' },
+};
+export function normPetLook(l, species) {
+  const cat = species === 'cat' || (l && l.kind === 'cat');
+  const d = { kind: cat ? 'cat' : 'dog', color: cat ? 'gray' : 'yellow', fur: 'straight', coat: 'short', pattern: cat ? 'stripes' : 'plain', eye: 'dark', nose: cat ? 'pink' : 'black', ear: 'up', tail: cat ? 'long' : 'short', acc: 'collar' };
+  const o = { ...d };
+  for (const k of Object.keys(d)) if (l && PET_OPTS[k] && PET_OPTS[k][l[k]]) o[k] = l[k];
+  return o;
 }
 
-function petSprite(kind, color, fur, dir, pose) {
-  const c = FUR[color] || FUR.brown;
+function eyeAt(p, x, y, ink, happy, iris) {
+  if (happy) { p.line(x - 3, y + 1, x - 1, y - 1, '#2a1c18', 1); p.line(x - 1, y - 1, x + 1, y - 1, '#2a1c18', 1); p.line(x + 1, y - 1, x + 3, y + 1, '#2a1c18', 1); return; }
+  p.ell(x, y, 2.4, 3, EYE);
+  if (iris) p.ell(x, y + .6, 1.7, 2.2, iris);
+  p.rect(x - 1.6, y - 2, 1.8, 1.8, '#fff'); p.set(x + 1, y + 1.4, '#ffffff'); if (!iris) p.set(x, y + 2, '#6a4a3a');
+}
+
+function drawAcc(p, acc, view, x, y) {
+  if (acc === 'collar') { if (view === 'h') { p.rect(x - 11, y - 2, 22, 4, COLLAR); p.disc(x, y + 3, 2.6, BELL); p.set(x - 1, y + 2, '#fff7b0'); } else { p.rect(x - 2, y - 5, 4, 10, COLLAR); p.disc(x, y + 6, 2.4, BELL); } }
+  else if (acc === 'ribbon') { p.poly([[x, y], [x - 8, y - 5], [x - 8, y + 5]], '#ff7fa6'); p.poly([[x, y], [x + 8, y - 5], [x + 8, y + 5]], '#ff7fa6'); p.disc(x, y, 2.6, '#e5487c'); p.set(x - 1, y - 1, '#ffd0e0'); }
+  else if (acc === 'scarf') { if (view === 'h') { p.rect(x - 12, y - 3, 24, 6, '#4f8fe0'); p.rect(x - 12, y - 1, 24, 1.5, '#fff'); p.rect(x + 4, y + 2, 6, 8, '#4f8fe0'); p.rect(x + 4, y + 6, 6, 1.5, '#fff'); } else { p.rect(x - 3, y - 6, 6, 12, '#4f8fe0'); p.rect(x - 3, y - 1, 6, 1.5, '#fff'); p.rect(x - 1, y + 5, 5, 6, '#4f8fe0'); } }
+}
+
+function petSprite(look, dir, pose) {
+  const { kind, color, fur, coat, pattern, eye, nose, ear, tail, acc } = normPetLook(look);
+  const c = FUR[color] || FUR.brown, iris = IRIS[eye], NOSE = NOSES[nose];
   const dog = kind !== 'cat';
   const base = c.base, shade = darken(base, .2), light = lighten(base, .22), belly = c.belly;
   const p = new Pix(PW, PH);
   const w1 = pose === 'walk1', w2 = pose === 'walk2', walk = w1 || w2, happy = pose === 'happy';
   const bob = walk ? -1 : 0;
-  const curly = fur === 'curly';
-  const stripes = !dog && color !== 'black' && color !== 'white';
-  const tuft = (x, y, r = 2.4) => { if (curly) { p.disc(x, y, r, base); p.disc(x - .6, y - .6, r * .55, light); } };
-  const lines = (pts, col, tall = 4) => pts.forEach(x => p.rect(x, 0, 2, tall, col));
+  const curly = fur === 'curly', longCoat = coat === 'long';
+  const stripes = pattern === 'stripes', spots = pattern === 'spots';
+  const tuft = (x, y, r = 2.4) => { if (curly) { p.disc(x, y, r, base); p.disc(x - .6, y - .6, r * .55, light); } else if (longCoat) { p.disc(x, y, r * .72, base); } };
+  const dots = list => list.forEach(([x, y, r = 2.6]) => p.disc(x, y, r, shade));
+  const down = ear === 'down';
 
   if (pose === 'rest') { // 엎드려 쉬는 모습 (왼쪽을 보고)
     p.ell(36, 38, 21, 9, base); p.ell(34, 36, 17, 5.5, light); p.ell(34, 43, 16, 3.4, belly);
     p.ell(15, 36, 10.5, 8.6, base); p.ell(13, 34, 7, 4.5, light); p.ell(9, 39, 6, 4, belly); p.ell(4.5, 38, 2.4, 1.8, NOSE);
     p.line(14, 33, 18, 33, '#2a1c18'); p.line(14, 34, 17, 34, '#2a1c18');
-    if (dog) { p.ell(22, 30, 5, 7, shade); p.ell(22, 31, 2.4, 4, EAR_IN); }
+    if (dog) { if (down) p.ell(21, 36, 4, 7, shade); else { p.ell(22, 30, 5, 7, shade); p.ell(22, 31, 2.4, 4, EAR_IN); } }
     else { p.poly([[12, 29], [14, 20], [20, 28]], base); p.poly([[14, 28], [15, 23], [18, 28]], EAR_IN); p.poly([[19, 28], [25, 21], [26, 30]], shade); }
-    if (dog) { p.ell(54, 38, 8, 5, shade); p.ell(57, 36, 3.4, 3, belly); } else { p.ell(52, 39, 11, 4, shade); p.ell(60, 38, 3, 3, shade); }
-    p.rect(24, 31, 4, 9, COLLAR); p.disc(25, 40, 2.1, BELL);
+    if (dog) { if (tail === 'long') { p.ell(55, 36, 9, 4, shade); p.ell(61, 33, 3, 3, belly); } else { p.ell(54, 38, 8, 5, shade); p.ell(57, 36, 3.4, 3, belly); } }
+    else { p.ell(52, 39, tail === 'long' ? 11 : 7, 4, shade); p.ell(tail === 'long' ? 60 : 57, 38, 3, 3, shade); }
+    drawAcc(p, acc, 'v', 26, 36);
     if (stripes) for (const x of [30, 36, 42]) p.rect(x, 29, 2, 6, shade);
-    if (curly) for (const [x, y] of [[24, 30], [34, 29], [44, 31], [52, 34], [18, 41]]) tuft(x, y);
+    if (spots) dots([[32, 31], [42, 34], [24, 31, 2]]);
+    if (curly || longCoat) for (const [x, y] of [[24, 30], [34, 29], [44, 31], [52, 34], [18, 41]]) tuft(x, y);
     p.bevel(.14, .2).outline(.58);
     return p.done(PAX, PAY);
   }
 
   if (dir === 'left') {
     const t = happy ? 4 : (walk ? (w1 ? -2 : 2) : 0);
-    // 꼬리
-    if (dog) { p.ell(53, 22 + t, 6.4, 8, base); p.ell(54, 17 + t, 3.8, 4, belly); p.ell(52, 23 + t, 3, 5, light); }
-    else { for (let i = 0; i < 16; i++) { const x = 46 + Math.sin(i / 2.8) * 4 + Math.min(i, 8) * .7, y = 38 - i * 1.9; p.disc(x, y + t * .3, 2.2, (i % 4 === 3 || i > 13) ? shade : base); } }
+    if (dog) { if (tail === 'long') { p.ell(55, 17 + t, 4.8, 11, base); p.ell(56, 9 + t, 3.2, 4, belly); } else { p.ell(53, 22 + t, 6.4, 8, base); p.ell(54, 17 + t, 3.8, 4, belly); p.ell(52, 23 + t, 3, 5, light); } }
+    else { const n = tail === 'long' ? 16 : 8; for (let i = 0; i < n; i++) { const x = 46 + Math.sin(i / 2.8) * 4 + Math.min(i, 8) * .7, y = 38 - i * 1.9; p.disc(x, y + t * .3, 2.2, (i % 4 === 3 || i > n - 3) ? shade : base); } }
     const l1 = w1 ? 2 : 0, l2 = w2 ? 2 : 0;
     p.rect(40, 34, 6, 9 - l2, shade); p.rect(45, 34, 6, 9 - l1, shade); p.rect(40, 41 - l2, 6, 3, belly); p.rect(45, 41 - l1, 6, 3, belly);
     p.ell(32, 29 + bob, dog ? 19 : 17, dog ? 11 : 9.4, base);
@@ -224,67 +271,72 @@ function petSprite(kind, color, fur, dir, pose) {
     p.ell(29, 36 + bob, 13, 5.2, belly);
     if (dog) p.ell(18, 32 + bob, 6, 7, belly);
     if (stripes) for (const x of [24, 30, 36, 42]) p.rect(x, 20 + bob, 2, 7, shade);
-    p.rect(17, 34 - l1, 6, 10 + (l1 ? 0 : 0), base); p.rect(24, 34 - l2, 6, 10, base);
+    if (spots) dots([[26, 23 + bob], [38, 26 + bob, 3.2], [46, 24 + bob], [32, 31 + bob, 2.2]]);
+    p.rect(17, 34 - l1, 6, 10, base); p.rect(24, 34 - l2, 6, 10, base);
     p.rect(17, 42 - l1, 6, 4, belly); p.rect(24, 42 - l2, 6, 4, belly);
     p.set(19, 44 - l1, '#cdbba0'); p.set(26, 44 - l2, '#cdbba0');
-    if (curly) for (const [x, y] of [[16, 24], [24, 19], [34, 18], [44, 21], [48, 28], [20, 38]]) tuft(x, y + bob);
-    // 머리
+    if (curly || longCoat) for (const [x, y] of [[16, 24], [24, 19], [34, 18], [44, 21], [48, 28], [20, 38], [30, 39], [40, 38]]) tuft(x, y + bob);
     const hy = 21 + bob;
     p.disc(16, hy, dog ? 10.4 : 10.8, base);
     p.ell(14, hy - 3, 7, 4.4, light);
     p.ell(dog ? 8 : 9.4, hy + 5.4, dog ? 6.8 : 4.4, dog ? 5 : 3.6, belly);
     p.ell(dog ? 3 : 5.4, hy + 3.6, 2.6, 2.1, NOSE); p.set(dog ? 2 : 4.4, hy + 2.6, '#fff');
-    if (dog) { p.poly([[11, hy - 8], [20, hy - 12], [23, hy - 1]], shade); p.poly([[14, hy - 7], [19, hy - 10], [20, hy - 4]], EAR_IN); p.poly([[14, hy - 8], [16, hy - 10], [17, hy - 2]], base); }
+    if (dog) { if (down) { p.ell(19, hy + 2, 4.2, 8, shade); } else { p.poly([[11, hy - 8], [20, hy - 12], [23, hy - 1]], shade); p.poly([[14, hy - 7], [19, hy - 10], [20, hy - 4]], EAR_IN); p.poly([[14, hy - 8], [16, hy - 10], [17, hy - 2]], base); } }
+    else if (down) { p.poly([[5, hy - 3], [6, hy - 8], [11, hy - 4]], base); p.poly([[10, hy - 4], [12, hy - 8], [15, hy - 3]], shade); }
     else {
-      p.poly([[7, hy - 5], [9, hy - 15], [18, hy - 8]], base); p.poly([[9, hy - 6], [10, hy - 12], [15, hy - 8]], EAR_IN);
-      p.poly([[17, hy - 9], [23, hy - 15], [25, hy - 3]], shade);
-      if (stripes) { p.rect(13, hy - 9, 2, 4, shade); p.rect(17, hy - 9, 2, 4, shade); }
+      p.poly([[3.5, hy - 3], [4.5, hy - 10], [10, hy - 4]], base); p.poly([[5, hy - 4], [5.5, hy - 8], [8.5, hy - 4.5]], EAR_IN);
+      p.poly([[9, hy - 4], [11.5, hy - 10], [14, hy - 3]], shade);
     }
-    if (happy) { p.line(10, hy - 1, 13, hy - 3, '#2a1c18'); p.line(13, hy - 3, 16, hy - 1, '#2a1c18'); } else eyeAt(p, 12, hy - 1, c.ink);
+    if (stripes) { p.rect(13, hy - 9, 2, 4, shade); p.rect(17, hy - 9, 2, 4, shade); }
+    if (happy) { p.line(10, hy - 1, 13, hy - 3, '#2a1c18'); p.line(13, hy - 3, 16, hy - 1, '#2a1c18'); } else eyeAt(p, 12, hy - 1, c.ink, false, iris);
     p.line(dog ? 3 : 5, hy + 7, dog ? 9 : 10, hy + 8, '#6b4636');
     if (dog && (walk || happy)) { p.ell(7, hy + 9, 2.6, 2.8, '#ff8a99'); p.set(7, hy + 8, '#ff5e75'); }
     if (!dog) { p.line(1, hy + 3, -0, hy + 2, '#fff'); p.line(2, hy + 5, 0, hy + 6, '#fff'); }
-    p.rect(21, hy + 3, 4, 10, COLLAR); p.disc(23, hy + 14, 2.4, BELL); p.set(22, hy + 13, '#fff7b0');
-    if (curly) for (const [x, y] of [[8, hy - 6], [22, hy + 6]]) tuft(x, y);
+    drawAcc(p, acc, 'v', 23, hy + 8);
+    if (curly || longCoat) for (const [x, y] of [[8, hy - 6], [22, hy + 6]]) tuft(x, y);
   } else if (dir === 'down') {
     const hy = 19 + bob;
-    if (!dog) { for (let i = 0; i < 14; i++) p.disc(48 + Math.sin(i / 2.5) * 3, 40 - i * 2, 2.2, i % 4 === 3 ? shade : base); }
+    if (!dog) { const n = tail === 'long' ? 14 : 6; for (let i = 0; i < n; i++) p.disc(48 + Math.sin(i / 2.5) * 3, 40 - i * 2, 2.2, i % 4 === 3 ? shade : base); }
+    else if (tail === 'long') { p.ell(47, 36, 3.6, 8, base); }
     p.ell(32, 37 + bob, dog ? 14 : 12, 10, base); p.ell(32, 40 + bob, 7.4, 6.4, belly);
     const l1 = w1 ? 2 : 0, l2 = w2 ? 2 : 0;
     p.rect(22, 41 - l1, 7, 6, belly); p.rect(35, 41 - l2, 7, 6, belly);
     p.line(25, 46 - l1, 25, 47 - l1, '#cdbba0'); p.line(38, 46 - l2, 38, 47 - l2, '#cdbba0');
-    if (curly) for (const [x, y] of [[19, 36], [45, 36], [32, 28]]) tuft(x, y + bob);
+    if (spots) dots([[22, 36 + bob], [43, 38 + bob, 3]]);
+    if (curly || longCoat) for (const [x, y] of [[19, 36], [45, 36], [32, 28], [24, 44], [40, 44]]) tuft(x, y + bob);
     p.ell(32, hy + 1, dog ? 17 : 16, dog ? 13.6 : 13, base); p.ell(30, hy - 5, 11, 4.4, light);
-    if (curly) for (const [x, y] of [[16, hy + 1], [48, hy + 1], [22, hy - 9], [42, hy - 9]]) tuft(x, y);
+    if (curly || longCoat) for (const [x, y] of [[16, hy + 1], [48, hy + 1], [22, hy - 9], [42, hy - 9], [20, hy + 8], [44, hy + 8]]) tuft(x, y);
     if (dog) {
-      p.poly([[15, hy - 1], [16, hy - 15], [26, hy - 8]], shade); p.poly([[49, hy - 1], [48, hy - 15], [38, hy - 8]], shade);
-      p.poly([[18, hy - 5], [18, hy - 11], [23, hy - 8]], EAR_IN); p.poly([[46, hy - 5], [46, hy - 11], [41, hy - 8]], EAR_IN);
+      if (down) { p.ell(14, hy + 3, 4.6, 9, shade); p.ell(50, hy + 3, 4.6, 9, shade); }
+      else { p.poly([[15, hy - 1], [16, hy - 15], [26, hy - 8]], shade); p.poly([[49, hy - 1], [48, hy - 15], [38, hy - 8]], shade); p.poly([[18, hy - 5], [18, hy - 11], [23, hy - 8]], EAR_IN); p.poly([[46, hy - 5], [46, hy - 11], [41, hy - 8]], EAR_IN); }
       p.poly([[30, hy - 12], [34, hy - 12], [36, hy + 3], [28, hy + 3]], belly);
-    } else {
-      p.poly([[16, hy - 1], [15, hy - 17], [27, hy - 10]], base); p.poly([[48, hy - 1], [49, hy - 17], [37, hy - 10]], base);
-      p.poly([[18, hy - 5], [18, hy - 13], [24, hy - 10]], EAR_IN); p.poly([[46, hy - 5], [46, hy - 13], [40, hy - 10]], EAR_IN);
-      if (stripes) { for (const x of [28, 32, 36]) p.rect(x, hy - 12, 1.5, 5, shade); }
-    }
+    } else if (down) { p.poly([[16, hy - 1], [15, hy - 10], [26, hy - 7]], base); p.poly([[48, hy - 1], [49, hy - 10], [38, hy - 7]], base); }
+    else { p.poly([[16, hy - 1], [15, hy - 17], [27, hy - 10]], base); p.poly([[48, hy - 1], [49, hy - 17], [37, hy - 10]], base); p.poly([[18, hy - 5], [18, hy - 13], [24, hy - 10]], EAR_IN); p.poly([[46, hy - 5], [46, hy - 13], [40, hy - 10]], EAR_IN); }
+    if (stripes) { for (const x of [28, 32, 36]) p.rect(x, hy - 12, 1.5, 5, shade); }
+    if (spots) dots([[22, hy - 4, 3], [44, hy + 2, 2.6]]);
     p.ell(32, hy + 7, dog ? 8.6 : 7, dog ? 6 : 5, belly);
     p.ell(32, hy + 4, 3.4, 2.4, NOSE); p.set(31, hy + 3, '#fff');
     p.line(32, hy + 6, 32, hy + 8, '#6b4636'); p.line(29, hy + 9, 32, hy + 8, '#6b4636'); p.line(35, hy + 9, 32, hy + 8, '#6b4636');
-    if (happy) { eyeAt(p, 24, hy - 2, c.ink, true); eyeAt(p, 40, hy - 2, c.ink, true); } else { eyeAt(p, 24, hy - 2, c.ink); eyeAt(p, 40, hy - 2, c.ink); }
+    if (happy) { eyeAt(p, 24, hy - 2, c.ink, true); eyeAt(p, 40, hy - 2, c.ink, true); } else { eyeAt(p, 24, hy - 2, c.ink, false, iris); eyeAt(p, 40, hy - 2, c.ink, false, iris); }
     if (dog && (walk || happy)) { p.ell(32, hy + 12, 3, 3.4, '#ff8a99'); p.line(32, hy + 10, 32, hy + 13, '#e8566e'); }
     if (!dog) { p.line(19, hy + 6, 11, hy + 4, '#fff'); p.line(19, hy + 8, 11, hy + 9, '#fff'); p.line(45, hy + 6, 53, hy + 4, '#fff'); p.line(45, hy + 8, 53, hy + 9, '#fff'); }
-    p.rect(21, hy + 13, 22, 4, COLLAR); p.disc(32, hy + 18, 2.6, BELL); p.set(31, hy + 17, '#fff7b0');
+    drawAcc(p, acc, 'h', 32, hy + 15);
   } else { // up (뒷모습)
     const hy = 20 + bob;
     p.ell(32, 37 + bob, dog ? 14 : 12, 10.4, base);
     const l1 = w1 ? 2 : 0, l2 = w2 ? 2 : 0;
     p.rect(22, 41 - l1, 7, 6, belly); p.rect(35, 41 - l2, 7, 6, belly);
     if (stripes) for (const x of [26, 31, 36]) p.rect(x, 30 + bob, 2, 8, shade);
-    if (dog) { p.ell(32, 33 + bob, 6.6, 6.6, base); p.ell(32, 31 + bob, 4, 4, belly); p.ell(31, 29 + bob, 2.4, 2.4, '#fff'); }
-    else { for (let i = 0; i < 12; i++) p.disc(32 + Math.sin(i / 2) * 3, 35 - i * 2.2 + bob, 2.2, i % 4 === 3 ? shade : base); }
+    if (spots) dots([[26, 34 + bob], [38, 36 + bob, 3]]);
+    if (dog) { const lg = tail === 'long'; p.ell(32, 33 + bob, lg ? 4 : 6.6, lg ? 8 : 6.6, base); p.ell(32, lg ? 27 + bob : 31 + bob, 3.4, 3.4, belly); p.ell(31, 29 + bob, 2.4, 2.4, '#fff'); }
+    else { const n = tail === 'long' ? 12 : 6; for (let i = 0; i < n; i++) p.disc(32 + Math.sin(i / 2) * 3, 35 - i * 2.2 + bob, 2.2, i % 4 === 3 ? shade : base); }
+    if (curly || longCoat) for (const [x, y] of [[19, 37], [45, 37], [24, 44], [40, 44]]) tuft(x, y + bob);
     p.ell(32, hy, dog ? 16 : 15, dog ? 13 : 12, base); p.ell(30, hy - 6, 10, 4, light);
-    if (curly) for (const [x, y] of [[17, hy], [47, hy], [32, hy - 11]]) tuft(x, y);
-    if (dog) { p.poly([[15, hy], [16, hy - 15], [26, hy - 8]], shade); p.poly([[49, hy], [48, hy - 15], [38, hy - 8]], shade); }
+    if (curly || longCoat) for (const [x, y] of [[17, hy], [47, hy], [32, hy - 11]]) tuft(x, y);
+    if (dog) { if (down) { p.ell(15, hy + 2, 4.6, 9, shade); p.ell(49, hy + 2, 4.6, 9, shade); } else { p.poly([[7, hy], [8, hy - 8], [13, hy - 4]].map(([x, y]) => [x + 8, y]), shade); p.poly([[23, hy], [22, hy - 8], [17, hy - 4]].map(([x, y]) => [x + 26, y]), shade); } }
+    else if (down) { p.poly([[16, hy], [15, hy - 9], [27, hy - 6]], base); p.poly([[48, hy], [49, hy - 9], [37, hy - 6]], base); }
     else { p.poly([[16, hy], [15, hy - 16], [27, hy - 9]], base); p.poly([[48, hy], [49, hy - 16], [37, hy - 9]], base); }
-    p.rect(21, hy + 11, 22, 4, COLLAR);
+    drawAcc(p, acc, 'h', 32, hy + 13);
   }
   p.bevel(.14, .2).outline(.58);
   return p.done(PAX, PAY);
@@ -295,7 +347,7 @@ const cache = new Map();
 const memo = (key, make) => { let v = cache.get(key); if (!v) { v = make(); cache.set(key, v); } return v; };
 
 export const playerFrame = (dir, frame, look) => memo(`pl|${dir}|${frame}|${lookKey(look)}`, () => player(dir === 'right' ? 'left' : dir, frame, look));
-export const petFrame = (kind, color, fur, dir, pose) => memo(`pet|${kind}|${color}|${fur}|${dir}|${pose}`, () => petSprite(kind, color, fur, dir === 'right' ? 'left' : dir, pose));
+export const petFrame = (look, dir, pose) => { const l = normPetLook(look); return memo(`pet|${JSON.stringify(l)}|${dir}|${pose}`, () => petSprite(l, dir === 'right' ? 'left' : dir, pose)); };
 export const PLAYER_ANCHOR = { ax: P_AX, ay: P_AY };
 
 export function playerFace(look) { // HUD 얼굴 아이콘

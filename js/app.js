@@ -734,7 +734,7 @@ function render() {
   const tabBar = h('nav', { class: 'tabbar', 'aria-label': '메뉴' }, h('div', { class: 'tabbar-inner' }, TABS.map(t => h('button', {
     class: 'tab' + (state.tab === t.id ? ' active' : ''),
     'aria-current': state.tab === t.id ? 'page' : null,
-    onclick: () => { if (state.tab !== t.id) { state.tab = t.id; render(); window.scrollTo(0, 0); } },
+    onclick: () => { if (t.id === 'care') { careCtx.openVillage(); return; } if (state.tab !== t.id) { state.tab = t.id; render(); window.scrollTo(0, 0); } }, // '돌보기' = 마을 게임으로 바로 이동
   }, ic(t.icon, { size: 24 }), t.label))));
 
   const newPost = state.tab === 'feed' && style === 'card'
@@ -744,7 +744,7 @@ function render() {
     h('header', { class: 'topbar' }, h('div', { class: 'topbar-row' },
       h('h1', { class: 'brand' }, ic('paw-print', { size: 26, fill: true }), '추억 저장소'),
       h('div', { class: 'topbar-actions' }, newPost))),
-    h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, care: () => renderCareTab(careCtx), map: () => renderMapTab(toast), more: renderMore })[state.tab]()),
+    h('main', { class: 'main' }, ({ feed: renderFeed, calendar: renderCalendar, care: renderFeed, map: () => renderMapTab(toast), more: renderMore })[state.tab]()),
     state.tab === 'feed' && style === 'timeline' && h('button', { class: 'fab', 'aria-label': '새 추억 쓰기', onclick: () => openCompose() }, ic('plus', { size: 30, stroke: 2.4 })),
     tabBar].filter(Boolean));
 }
@@ -950,7 +950,6 @@ function refreshTimes() {
 setInterval(refreshTimes, 30000);
 document.addEventListener('visibilitychange', () => {
   refreshTimes(); // 앱으로 돌아오면 바로 갱신
-  if (!document.hidden && state.tab === 'care' && state.pets.length) render(); // 그동안 줄어든 수치 반영
 });
 
 /* ---------- 시작 ---------- */
