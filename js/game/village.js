@@ -4,7 +4,7 @@ import { h } from '../util.js';
 import { Pix, iconURL, rng } from './pixel.js';
 import * as P from './props.js';
 import { buildWorld, boxFree, zoneAt, TS, GW, GH, GARDEN } from './world.js';
-import { playerFrame, petFrame, playerFace, CHAR_SCALE } from './sprites.js';
+import { playerFrame, petFrame, playerFace, CHAR_SCALE, LOOKS, DEFAULT_LOOK } from './sprites.js';
 import { currentStats, levelOf, levelFloor } from '../care.js';
 
 /* ======================= 데이터 정의 ======================= */
@@ -54,7 +54,7 @@ let G = null; // 열려 있는 동안만 존재
 let opening = false, worldCache = null; // 마을 지도는 한 번만 만든다
 
 function defaults() {
-  return { id: SAVE_ID, v: 1, name: '보호자', x: null, y: null, dir: 'down', companionId: null, bag: { flower: 0, berry: 0, stick: 0, gem: 0 }, gathered: {}, owned: { cushion: 0, pot: 0, bench: 0 }, placed: [], purse: 0, petPos: {}, seenHelp: false };
+  return { id: SAVE_ID, v: 1, name: '보호자', look: { ...DEFAULT_LOOK }, x: null, y: null, dir: 'down', companionId: null, bag: { flower: 0, berry: 0, stick: 0, gem: 0 }, gathered: {}, owned: { cushion: 0, pot: 0, bench: 0 }, placed: [], purse: 0, petPos: {}, seenHelp: false };
 }
 function sanitizeSave(raw) {
   const d = defaults(), s = { ...d, ...(raw || {}) };
@@ -63,6 +63,7 @@ function sanitizeSave(raw) {
   s.bag = Object.fromEntries(Object.keys(ITEMS).map(k => [k, n(s.bag && s.bag[k])]));
   s.owned = Object.fromEntries(Object.keys(FURN).map(k => [k, n(s.owned && s.owned[k])]));
   s.placed = (Array.isArray(s.placed) ? s.placed : []).filter(p => p && FURN[p.type] && Number.isFinite(p.tx) && Number.isFinite(p.ty)).map(p => ({ uid: String(p.uid || Math.random().toString(36).slice(2)), type: p.type, tx: Math.floor(p.tx), ty: Math.floor(p.ty) }));
+  s.look = { hair: LOOKS.hair[s.look && s.look.hair] ? s.look.hair : DEFAULT_LOOK.hair, dress: LOOKS.dress[s.look && s.look.dress] ? s.look.dress : DEFAULT_LOOK.dress, skin: LOOKS.skin[s.look && s.look.skin] ? s.look.skin : DEFAULT_LOOK.skin };
   s.gathered = s.gathered && typeof s.gathered === 'object' ? s.gathered : {};
   s.petPos = s.petPos && typeof s.petPos === 'object' ? s.petPos : {};
   s.purse = n(s.purse);
@@ -89,6 +90,14 @@ const earn = n => { G.save.purse += n; G.dirty = true; };
 /* ======================= 열기 / 닫기 ======================= */
 let escHandler = null, popHandler = null, pushed = false;
 
+// 전체 화면 + 가로 고정 요청. 거부되거나 지원하지 않아도(예: iPhone) 게임은 그대로 열리고, 세로면 회전 안내가 뜬다.
+function enterFullscreen() {
+  (async () => {
+    try { const el = document.documentElement; if (el.requestFullscreen && !document.fullscreenElement) await el.requestFullscreen({ navigationUI: 'hide' }); } catch { /* 무시 */ }
+    try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch { /* 무시 */ }
+  })();
+}
+
 export function isVillageOpen() { return !!G; }
 export function __debug() { return G; } // 시험용: 실행 중인 게임 상태를 들여다본다 (화면에는 영향 없음)
 
@@ -97,12 +106,13 @@ export async function openVillage(ctx) {
   const pets = ctx.state.pets;
   if (!pets.length) { ctx.toast('먼저 반려동물을 등록해 주세요.'); return; }
   opening = true;
+  enterFullscreen(); // 버튼을 누른 직후(사용자 조작 직후)에만 허용되므로 가장 먼저 요청한다
   const loading = h('div', { class: 'vg-loading' }, h('div', { class: 'vg-load-ico' }, '🌸'), h('p', {}, '별빛 꼬리 마을을 여는 중…'));
   document.body.append(loading);
   await new Promise(r => setTimeout(r, 40)); // 로딩 화면이 먼저 그려지도록
   let row; try { row = (await db.getAll('game')).find(r => r.id === SAVE_ID); } catch { row = null; }
   let world;
-  try { world = worldCache || (worldCache = buildWorld()); } catch (e) { loading.remove(); opening = false; ctx.toast('마을을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.'); return; }
+  try { world = worldCache || (worldCache = buildWorld()); } catch (e) { loading.remove(); opening = false; try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* 무시 */ } ctx.toast('마을을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.'); return; }
   G = { ctx, world, save: sanitizeSave(row), dirty: false, t: 0, raf: 0, last: 0, S: 2, dpr: 1, vw: 0, vh: 0, cam: { x: 0, y: 0 }, keys: {}, joy: { dx: 0, dy: 0, id: null }, particles: [], pets: [], sel: 'basket', zoneId: null, hudT: 0, saveT: 0, actKey: '', act: null, act2: null, closing: false, tags: new Map(), rot: null };
   setupPlayer(); setupPets(); setupFlies(); buildUI(); resize();
   loading.remove(); opening = false;
@@ -113,8 +123,6 @@ export async function openVillage(ctx) {
   try { history.pushState({ village: 1 }, ''); pushed = true; } catch { pushed = false; }
   popHandler = () => { if (G && pushed) { pushed = false; closeNow(); } };
   window.addEventListener('popstate', popHandler);
-  try { const el = document.documentElement; if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' }); } catch { /* 허용되지 않아도 계속 */ }
-  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch { /* iPhone 등은 회전 안내 */ }
   resize();
   G.last = 0; G.raf = requestAnimationFrame(frame);
   if (!G.save.seenHelp) { G.save.seenHelp = true; G.dirty = true; showHelp(); }
@@ -441,7 +449,7 @@ function render() {
   for (const s of world.spots) { if (s.x < cx - 20 || s.x > cx + vw + 20 || s.y < cy - 10 || s.y > cy + vh + 30) continue; const act = spotActive(s), spr = act ? s.sprites.full : s.sprites.empty; list.push({ sy: s.y, f: () => { drawSpr(g, spr, s.x, s.y); if (act) { const a = (Math.sin(G.t * 3 + s.x) + 1) / 2; if (a > .5) drawSpr(g, sparkSpr(), s.x + 8, s.y - 18 - a * 2); } } }); }
   for (const f of G.save.placed) { const def = FURN[f.type], spr = def.spr(), x = (f.tx + def.w / 2) * TS, y = (f.ty + 1) * TS - 2; list.push({ sy: y, f: () => drawSpr(g, f.type === 'bench' ? spr : spr, x, y) }); }
   const pl = G.player;
-  list.push({ sy: pl.y, f: () => { const fr = pl.moving ? [1, 0, 2, 0][Math.floor(pl.t / .13) % 4] : 0; const br = pl.moving ? 0 : (Math.sin(G.t * 2.3) > .55 ? -1 : 0); shadow(g, pl.x, pl.y, 8); drawSpr(g, playerFrame(pl.dir, fr), pl.x, pl.y + br, CHAR_SCALE, pl.dir === 'right'); } });
+  list.push({ sy: pl.y, f: () => { const fr = pl.moving ? [1, 0, 2, 0][Math.floor(pl.t / .13) % 4] : 0; const br = pl.moving ? 0 : (Math.sin(G.t * 2.3) > .55 ? -1 : 0); shadow(g, pl.x, pl.y, 8); drawSpr(g, playerFrame(pl.dir, fr, G.save.look), pl.x, pl.y + br, CHAR_SCALE, pl.dir === 'right'); } });
   for (const pet of G.pets) list.push({ sy: pet.y, f: () => { const pose = pet.state === 'rest' ? 'rest' : pet.state === 'happy' ? 'happy' : pet.moving ? (Math.floor(pet.anim / .18) % 2 ? 'walk1' : 'walk2') : 'stand'; const d = pet.state === 'rest' ? (pet.dir === 'right' ? 'right' : 'left') : pet.dir; shadow(g, pet.x, pet.y, pet.state === 'rest' ? 10 : 8); const bounce = pet.state === 'happy' ? -Math.abs(Math.sin(pet.anim * 9)) * 3 : (!pet.moving && pet.state !== 'rest' && Math.sin(G.t * 2.6 + pet.speed) > .5 ? -1 : 0); drawSpr(g, petFrame(pet.look.kind, pet.look.color, pet.look.fur, d, pose), pet.x, pet.y + bounce, CHAR_SCALE, d === 'right'); } });
   list.sort((a, b) => a.sy - b.sy);
   for (const it of list) it.f();
@@ -539,7 +547,7 @@ function resize() {
 function buildUI() {
   const cv = h('canvas', { class: 'vg-canvas' });
   const tags = h('div', { class: 'vg-tags' });
-  const faceImg = h('img', { class: 'vg-face', src: iconURL(playerFace(), 3), alt: '' });
+  const faceImg = h('img', { class: 'vg-face', src: iconURL(playerFace(G.save.look), 3), alt: '' }); G.faceImg = faceImg;
   G.nameEl = h('div', { class: 'vg-name' }); G.lvEl = h('div', { class: 'vg-lv' });
   G.heartBar = h('i', {}); G.starBar = h('i', {});
   const prof = h('div', { class: 'vg-panel vg-prof' }, h('div', { class: 'vg-face-wrap' }, faceImg),
@@ -652,8 +660,13 @@ function openBag() {
 }
 function openSettings() {
   const input = h('input', { class: 'vg-input', maxLength: 10, value: G.save.name, 'aria-label': '내 이름' });
+  const lookRow = (key, label) => h('div', { class: 'vg-lab' }, label, h('div', { class: 'vg-chips' }, Object.entries(LOOKS[key]).map(([id, v]) => h('button', {
+    type: 'button', class: 'vg-chip' + (G.save.look[key] === id ? ' on' : ''), 'aria-pressed': String(G.save.look[key] === id), title: v.name,
+    onclick: ev => { G.save.look[key] = id; G.dirty = true; G.faceImg.src = iconURL(playerFace(G.save.look), 3); ev.currentTarget.parentNode.querySelectorAll('.vg-chip').forEach(b => b.classList.remove('on')); ev.currentTarget.classList.add('on'); },
+  }, h('i', { style: `background:${v.hair || v.dress || v.skin}` }), v.name))));
   modal('설정', h('div', { class: 'vg-info' },
     h('label', { class: 'vg-lab' }, '내 이름', input),
+    lookRow('hair', '머리 색'), lookRow('dress', '원피스 색'), lookRow('skin', '피부색'),
     h('button', { class: 'vg-btn', onclick: () => { const v = input.value.trim().slice(0, 10); if (!v) { toast('이름을 입력해 주세요'); return; } G.save.name = v; G.dirty = true; paintHud(); toast('이름을 저장했어요'); G.modal && G.modal.close(); } }, '이름 저장'),
     h('button', { class: 'vg-btn', onclick: () => { G.modal && G.modal.close(); showHelp(); } }, '도움말'),
     h('button', { class: 'vg-btn danger', onclick: () => closeVillage() }, '마을에서 나가기')));

@@ -13,7 +13,7 @@ function weave(p, cx, cy, rx, ry, c, step = 2) {
 }
 
 /* ======================= 주인공 (밀짚모자 소녀) ======================= */
-const C = {
+const BASE = {
   skin: '#ffe1c2', skinD: '#efb994', blush: '#ff9fae',
   hair: '#8c5232', hairD: '#5f3520', hairL: '#b87a4a',
   hat: '#f1cf7b', hatD: '#cda24b', hatL: '#fbe9ab', weave: '#dfb95e',
@@ -22,7 +22,18 @@ const C = {
   white: '#fff7e8', whiteD: '#e6d6bb',
   boot: '#7a4527', bootL: '#a56a41', eye: '#3a2118', iris: '#7a4a28',
 };
+let C = BASE; // 그리는 동안만 외형 설정으로 바뀐다
 const P_W = 52, P_H = 72, P_AX = 26, P_AY = 66;
+
+// 주인공 외형 선택지 (나중에 피부색·의상·액세서리를 같은 방식으로 늘릴 수 있다)
+export const LOOKS = {
+  hair: { brown: { name: '밤색', hair: '#8c5232', hairD: '#5f3520', hairL: '#b87a4a' }, black: { name: '검정', hair: '#3b3340', hairD: '#241d29', hairL: '#6a5d78' }, blonde: { name: '금발', hair: '#d9a441', hairD: '#a8751f', hairL: '#f2cd7a' }, pink: { name: '분홍', hair: '#d9739c', hairD: '#a84a73', hairL: '#f2a3c0' } },
+  dress: { pink: { name: '분홍', dress: '#e65b73', dressD: '#b9405a', dressL: '#f78ca1' }, blue: { name: '파랑', dress: '#4f8fe0', dressD: '#346cb8', dressL: '#86b6f2' }, green: { name: '초록', dress: '#4fae6a', dressD: '#358a4e', dressL: '#85d09b' }, yellow: { name: '노랑', dress: '#f0b429', dressD: '#c4881a', dressL: '#f8d36a' } },
+  skin: { light: { name: '밝은', skin: '#ffe1c2', skinD: '#efb994' }, tan: { name: '구릿빛', skin: '#e8b88a', skinD: '#c98f62' }, deep: { name: '짙은', skin: '#b9774f', skinD: '#965a37' } },
+};
+export const DEFAULT_LOOK = { hair: 'brown', dress: 'pink', skin: 'light' };
+const lookKey = l => `${l?.hair || 'brown'}-${l?.dress || 'pink'}-${l?.skin || 'light'}`;
+const palette = l => ({ ...BASE, ...(LOOKS.hair[l?.hair] || LOOKS.hair.brown), ...(LOOKS.dress[l?.dress] || LOOKS.dress.pink), ...(LOOKS.skin[l?.skin] || LOOKS.skin.light) });
 
 function hairWaves(p, x0, x1, y, count, color) { // 머리끝 물결
   for (let i = 0; i < count; i++) p.disc(x0 + (x1 - x0) * i / (count - 1), y + (i % 2) * 2, 3.2, color);
@@ -59,7 +70,8 @@ function flowersAt(p, x, y) {
   }
 }
 
-function player(dir, frame) {
+function player(dir, frame, look) {
+  C = palette(look);
   const p = new Pix(P_W, P_H);
   const walk = frame === 1 || frame === 2;
   const bob = walk ? -1 : 0;
@@ -154,6 +166,7 @@ function player(dir, frame) {
     bowAt(p, 42, 20 + y0, .9); flowersAt(p, 12, 13 + y0);
   }
   p.bevel(.14, .2).outline(.58);
+  C = BASE;
   return p.done(P_AX, P_AY);
 }
 
@@ -281,13 +294,13 @@ function petSprite(kind, color, fur, dir, pose) {
 const cache = new Map();
 const memo = (key, make) => { let v = cache.get(key); if (!v) { v = make(); cache.set(key, v); } return v; };
 
-export const playerFrame = (dir, frame) => memo(`pl|${dir}|${frame}`, () => player(dir === 'right' ? 'left' : dir, frame));
+export const playerFrame = (dir, frame, look) => memo(`pl|${dir}|${frame}|${lookKey(look)}`, () => player(dir === 'right' ? 'left' : dir, frame, look));
 export const petFrame = (kind, color, fur, dir, pose) => memo(`pet|${kind}|${color}|${fur}|${dir}|${pose}`, () => petSprite(kind, color, fur, dir === 'right' ? 'left' : dir, pose));
 export const PLAYER_ANCHOR = { ax: P_AX, ay: P_AY };
 
-export function playerFace() { // HUD 얼굴 아이콘
-  return memo('face', () => {
-    const f = playerFrame('down', 0);
+export function playerFace(look) { // HUD 얼굴 아이콘
+  return memo('face|' + lookKey(look), () => {
+    const f = playerFrame('down', 0, look);
     const p = new Pix(36, 32);
     p.g.drawImage(f.cv, 8, 2, 36, 32, 0, 0, 36, 32);
     return p.done();

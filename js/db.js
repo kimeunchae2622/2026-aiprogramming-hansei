@@ -22,9 +22,15 @@ function open() {
       if (e.oldVersion < 3) db.createObjectStore('characters', { keyPath: 'id' }); // id = 반려동물 id
       if (e.oldVersion < 4) db.createObjectStore('game', { keyPath: 'id' });       // 마을 게임 저장 (id = 'village')
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // 다른 창이 더 새 버전으로 올리려 하면 이 연결을 닫아 길을 비켜 준다 (업그레이드가 막히지 않도록)
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error('blocked'));
+    // 다른 창이 예전 버전을 붙잡고 있으면 잠깐(4초) 기다려 본다. 그래도 안 되면 그때 실패 처리
+    req.onblocked = () => setTimeout(() => reject(new Error('blocked')), 4000);
   });
   return dbPromise;
 }

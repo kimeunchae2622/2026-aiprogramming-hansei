@@ -118,3 +118,8 @@
 @keyframes vgspin { to { transform: rotate(360deg); } }
 
 @media (max-width: 720px) { .vg-slot { width: calc(33 * var(--a)); height: calc(33 * var(--a)); } .vg-hotbar { gap: calc(3 * var(--a)); padding: calc(4 * var(--a)); } .vg-act-wrap { right: calc(14 * var(--a) + var(--safe-r)); } .vg-act2-wrap { right: calc(100 * var(--a) + var(--safe-r)); } .vg-joy { left: calc(14 * var(--a) + var(--safe-l)); width: calc(100 * var(--a)); height: calc(100 * var(--a)); } }
+
+.vg-chips { display: flex; flex-wrap: wrap; gap: calc(5 * var(--a)); }
+.vg-chip { display: inline-flex; align-items: center; gap: calc(5 * var(--a)); padding: calc(4 * var(--a)) calc(10 * var(--a)); border: calc(2 * var(--a)) solid #d6b57c; border-radius: 999px; background: #fff7df; color: #5a3a1e; font-weight: 800; font-size: calc(12 * var(--a)); cursor: pointer; }
+.vg-chip i { width: calc(14 * var(--a)); height: calc(14 * var(--a)); border-radius: 50%; border: calc(1.5 * var(--a)) solid rgba(0, 0, 0, .25); }
+.vg-chip.on { border-color: #e8643a; background: #ffe9c2; }
