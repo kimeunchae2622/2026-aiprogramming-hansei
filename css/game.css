@@ -112,3 +112,7 @@
 .village-entry strong { font-size: 1.12rem; font-weight: 900; }
 .village-entry span { font-size: .84rem; font-weight: 700; opacity: .85; }
 .village-entry .ve-go { background: #fff; color: #2f7d3a; font-weight: 900; border-radius: 999px; padding: 8px 14px; font-size: .9rem; }
+
+.vg-loading { position: fixed; inset: 0; z-index: 310; background: #2d5a2a; color: #fff6dc; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; font-weight: 800; font-size: 18px; }
+.vg-load-ico { font-size: 56px; animation: vgspin 1.6s linear infinite; }
+@keyframes vgspin { to { transform: rotate(360deg); } }

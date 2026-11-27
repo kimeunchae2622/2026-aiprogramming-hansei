@@ -1,7 +1,15 @@
 // 별빛 꼬리 마을 지도: 지형(풀·물·돌길·광장)을 픽셀 단위로 칠하고, 건물·나무·소품을 배치하고, 충돌을 계산한다.
 // 항상 같은 난수 씨앗으로 만들기 때문에 접속할 때마다 마을이 똑같다.
 import { Pix, rng, rgb, mix, darken, lighten } from './pixel.js';
-import * as P from './props.js';
+import * as PP from './props.js';
+
+// 같은 인자로 부르면 같은 그림을 돌려준다 (나무 수백 그루를 매번 새로 그리지 않도록)
+const spriteCache = new Map();
+const P = new Proxy(PP, { get(t, k) {
+  const v = t[k];
+  if (typeof v !== 'function') return v;
+  return (...a) => { const key = k + ':' + a.join(','); let s = spriteCache.get(key); if (!s) { s = v(...a); spriteCache.set(key, s); } return s; };
+} });
 
 export const TS = 16, WW = 96, WH = 64, GW = WW * TS, GH = WH * TS;
 const T = v => v * TS;
@@ -76,8 +84,9 @@ export function buildWorld() {
 
   /* 2) 풀·물·광장 칠하기 */
   const img = new ImageData(GW, GH), u = new Uint32Array(img.data.buffer);
-  const grass = ['#8dcc4d', '#85c446', '#94d357', '#80bf42'].map(px32);
-  const forest = ['#79b845', '#72b041', '#80c04b', '#6ba93c'].map(px32);
+  const grass = ['#8dcc4d', '#85c446', '#94d357', '#80bf42'].map(px32), grassL = ['#9bd95d', '#93d255', '#a3df66', '#8ecb4f'].map(px32), grassD = ['#79b83e', '#72b038', '#82c046', '#6aa834'].map(px32);
+  const forest = ['#79b845', '#72b041', '#80c04b', '#6ba93c'].map(px32), forestL = ['#86c552', '#7fbe4c', '#8dcd58', '#78b845'].map(px32), forestD = ['#69a73a', '#62a035', '#70b040', '#5a9a30'].map(px32);
+  const vn = (x, y, s) => { const gx = Math.floor(x), gy = Math.floor(y), fx = x - gx, fy = y - gy, a = hash(gx, gy, s), b = hash(gx + 1, gy, s), c = hash(gx, gy + 1, s), d = hash(gx + 1, gy + 1, s), sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy); return (a + (b - a) * sx) + ((c + (d - c) * sx) - (a + (b - a) * sx)) * sy; };
   const stoneC = ['#dcc3a0', '#cfb28d', '#e6d1b1'].map(px32), mortar = px32('#a98763'), rim = px32('#8f7655');
   const wAt = (x, y) => (x < 0 || y < 0 || x >= GW || y >= GH) ? 0 : water[y * GW + x];
   for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) {
@@ -98,7 +107,7 @@ export function buildWorld() {
       if (y % 7 === 0 || (x + xo) % 10 === 0) u[i] = mortar; else u[i] = stoneC[Math.floor(hash(col, row, 3) * 3)];
       continue;
     }
-    const f = y < T(33) ? forest : grass;
+    const nz = vn(x / 44, y / 44, 5), inF = y < T(33), f = nz > .62 ? (inF ? forestL : grassL) : nz < .3 ? (inF ? forestD : grassD) : (inF ? forest : grass);
     u[i] = f[Math.floor(hash(x >> 2, y >> 2, 1) * 4)];
   }
   const ground = new Pix(GW, GH);
@@ -129,12 +138,12 @@ export function buildWorld() {
       const nx = -(by - ay) / (len / TS), ny = (bx - ax) / (len / TS);
       for (let k = 0; k <= steps; k++) {
         const t = k / steps, cx = T(ax + (bx - ax) * t), cy = T(ay + (by - ay) * t);
-        for (const off of (k % 2 ? [-.7, .05, .8] : [-1.05, -.35, .4, 1.1])) {
+        for (const off of (k % 2 ? [-.5, .5] : [-1.0, 0, 1.0])) {
           const lat = off * pth.w * TS * .5 * .92 + (r() - .5) * 4;
           const x = cx + nx * lat + (r() - .5) * 3, y = cy + ny * lat + (r() - .5) * 3;
           if (wAt(Math.round(x), Math.round(y))) continue;
           const dp = Math.hypot(x - T(PLAZA.cx), y - T(PLAZA.cy)); if (dp < T(PLAZA.r) - 6) continue;
-          stone(x, y, 5.5 + r() * 2.2, 4.2 + r() * 1.6);
+          stone(x, y, 6 + r() * 2.2, 4.4 + r() * 1.5);
         }
       }
       for (let k = 0; k <= len / 8; k++) { // 길 주변 타일 표시
@@ -213,7 +222,7 @@ export function buildWorld() {
     occ.add(key(Math.floor(tx), Math.floor(ty)));
     return ob;
   };
-  const inGarden = (x, y) => x > 5.5 && x < 32 && y > 36 && y < 61;
+  const inGarden = (x, y) => (x > 5.5 && x < 32 && y > 36 && y < 61) || (x > 69.5 && x < 93.5 && y > 52.5 && y < 62.5); // 우리 집 정원과 농장(손으로 꾸민 곳)
   const free = (tx, ty, pad = 0) => {
     for (let a = -pad; a <= pad; a++) for (let b = -pad; b <= pad; b++) {
       const x = Math.floor(tx) + a, y = Math.floor(ty) + b;
@@ -245,6 +254,10 @@ export function buildWorld() {
   };
   fence(6, 37, 31, 60, false, (x, y) => x === 31 && y >= 50 && y <= 53);
   fence(70, 53, 93, 61, true, (x, y) => x === 70 && y >= 56 && y <= 58);
+  const bloom = (fn, tx, ty, seed) => add(fn(seed), tx, ty, { col: [-8, -5, 8, 0], kind: 'bloom' });
+  for (const [tx, ty, k] of [[12.8, 46.6, 0], [14.6, 46.8, 1], [20.4, 46.8, 2], [21.8, 46.4, 0], [10, 41.6, 1], [26, 40.2, 2], [8.2, 48.6, 0], [29, 54.6, 1], [29.2, 44, 2], [26.4, 48.4, 0], [8.6, 38.8, 2], [12, 38.6, 1], [17, 38.8, 0], [22, 38.8, 2], [28, 38.8, 1]])
+    bloom([P.hydrangea, P.lavender, P.tulips][k], tx, ty, tx * 3 + ty);
+  add(P.blanket(), 12.6, 43.6); add(P.stump(), 14.6, 42.4, { col: [-6, -4, 6, 0] }); add(P.lanternGround(), 14.6, 41.7);
   /* 8) 마을 광장 */
   const fountain = add(P.fountain(0), 52, 46.4, { col: [-26, -14, 26, 0], kind: 'fountain', frames: [P.fountain(0), P.fountain(1)] });
   world.anim.push(fountain);
@@ -258,6 +271,8 @@ export function buildWorld() {
     if (Math.abs(a % 6.28 - 4.71) < .5) continue; // 북쪽(상점 길)은 비운다
     add(P.pot(k + 5), x, y, { col: [-5, -4, 5, 0] });
   }
+  for (const [tx, ty, k] of [[41.4, 40.6, 2], [43, 38.6, 1], [62.2, 38.6, 0], [63.6, 41.4, 2], [46.6, 56.4, 0], [57.6, 56.6, 1], [40.2, 46, 1], [65, 52.4, 0], [48.4, 47.6, 2], [55.8, 47.6, 0]])
+    bloom([P.hydrangea, P.lavender, P.tulips][k], tx, ty, tx * 5 + ty);
   add(P.noticeBoard(), 42.6, 49.4, { col: [-14, -6, 14, 0] });
   world.interacts.push({ id: 'board', kind: 'info', x: T(42.6), y: T(50.2), r: 26, label: '마을 안내판', text: '별빛 꼬리 마을에 어서 와요! 숲과 호수에서 꽃·열매·나뭇가지·반짝이는 조각을 모으고, 상점에서 정원 가구를 살 수 있어요.' });
   add(P.mailbox(), 41, 54, { col: [-4, -5, 4, 0] });
@@ -307,6 +322,11 @@ export function buildWorld() {
     const x = 3 + r() * 90, y = 3 + r() * 58;
     if (!free(x, y, 0) || Math.hypot(x - 52, y - 45) < 12.5 || inGarden(x, y)) continue;
     add(P.bush(r() > .6 ? 'flower' : 'plain', Math.floor(r() * 4)), x, y, { col: [-9, -5, 9, 0], kind: 'bush' }); n++;
+  }
+  for (let i = 0, n = 0; i < 4000 && n < 26; i++) {
+    const x = 4 + r() * 90, y = 4 + r() * 56;
+    if (!free(x, y, 0) || inGarden(x, y)) continue;
+    bloom([P.hydrangea, P.lavender, P.tulips][n % 3], x, y, n + 11); n++;
   }
   // 폭포 바위
   for (const [x, y] of [[85.8, 22.4], [89.6, 22.2], [93, 22.8], [32.4, 22.6], [36, 22.6]]) add(P.rock(1), x, y, { col: [-14, -9, 14, 0] });

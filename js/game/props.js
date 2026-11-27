@@ -62,6 +62,11 @@ export function cherryTree(seed = 1, size = 'l') {
     p.rect(cx - 4, H - th - 18, 8, 18, '#7d4b29'); p.rect(cx - 4, H - th - 18, 3, 18, '#a8693f');
     p.line(cx, H - th - 10, cx - 14, H - th - 24, '#7d4b29', 3); p.line(cx, H - th - 12, cx + 15, H - th - 26, '#7d4b29', 3);
     canopy(p, r, cx, big ? 34 : 28, big ? 32 : 24, ['#d9709c', '#f08db3', '#ffb3cf', '#ffe4ee'], big ? 12 : 9);
+    const R = big ? 30 : 22, cyy = big ? 34 : 28;
+    for (let i = 0; i < (big ? 150 : 80); i++) { // 꽃송이 무리: 작은 꽃잎 5장짜리 점
+      const a = r() * 6.28, d = Math.sqrt(r()) * R, x = cx + Math.cos(a) * d * 1.05, y = cyy + Math.sin(a) * d * .8, c = r.pick(['#ffe4ee', '#ffc3d9', '#ff9fc2', '#fff7fa']);
+      p.rect(x, y - 1, 3, 1, c); p.rect(x - 1, y, 5, 1, c); p.rect(x, y + 1, 3, 1, c); p.set(x + 1, y, '#ffd24a');
+    }
     for (let i = 0; i < (big ? 40 : 24); i++) p.rect(cx - 30 + r() * 60, 6 + r() * 50, 2, 2, r() > .5 ? '#fff3f7' : '#ffd0e0');
   }, { ax: W / 2, ay: H - 3, bevel: false });
 }
@@ -359,4 +364,52 @@ export function fenceH(wood = false) {
 export function fenceV(wood = false) {
   const W = 16, H = 16, c = wood ? '#c98a52' : '#f4efe4', cd = wood ? '#8a5230' : '#cfc7b6';
   return mk(W, H, p => { p.rect(7, 0, 2, 16, cd); for (const y of [1, 9]) { p.rect(5, y, 6, 6, c); p.rect(5, y + 5, 6, 1, cd); } }, { bevel: false, ay: 15 });
+}
+
+/* ---------- 꽃무더기 / 피크닉 (참고 이미지의 정원 분위기) ---------- */
+export function hydrangea(seed = 1) {
+  const r = rng(seed * 53 + 9), W = 30, H = 24;
+  const cols = ['#6f9cff', '#8fb6ff', '#5b86e8', '#a9c6ff'];
+  return mk(W, H, p => {
+    canopy(p, r, 15, 15, 11, ['#2f7a3a', '#4fa845', '#79c456', '#a8e070'], 6);
+    for (let i = 0; i < 9; i++) { const x = 6 + r() * 18, y = 4 + r() * 11; p.disc(x, y, 3.4, r.pick(cols)); p.disc(x - 1, y - 1, 1.6, '#d6e4ff'); }
+  }, { ay: H - 2 });
+}
+export function lavender(seed = 1) {
+  const r = rng(seed * 71 + 3), W = 26, H = 28;
+  return mk(W, H, p => {
+    for (let i = 0; i < 7; i++) {
+      const x = 3 + i * 3.2, top = 3 + r() * 6;
+      p.rect(x, top + 6, 1, H - top - 8, '#4f9a44');
+      for (let y = top; y < top + 9; y += 2) p.disc(x + .5, y, 1.7, y % 4 ? '#a98bd6' : '#c4a8ee');
+    }
+    p.ell(13, H - 6, 11, 4, '#3f8f3a'); p.ell(13, H - 7, 9, 3, '#5fb04f');
+  }, { ay: H - 2 });
+}
+export function tulips(seed = 1) {
+  const r = rng(seed * 29 + 5), W = 28, H = 24, cols = ['#ff7fa6', '#ffd23f', '#ff9bbd', '#ffffff', '#ff6f91'];
+  return mk(W, H, p => {
+    p.ell(14, H - 5, 12, 4.5, '#3f8f3a');
+    for (let i = 0; i < 7; i++) {
+      const x = 4 + i * 3.4, y = 4 + r() * 7, c = r.pick(cols);
+      p.rect(x, y + 4, 1, H - y - 8, '#4fa845');
+      p.poly([[x - 2.4, y + 3], [x + 3.4, y + 3], [x + 3.4, y - 2], [x + 1, y + 0], [x + .5, y - 3], [x, y], [x - 2.4, y - 2]], c);
+      p.rect(x - 1, y + 1, 2, 1, lighten(c, .4));
+    }
+    p.poly([[5, H - 6], [9, H - 12], [11, H - 6]], '#5fb04f'); p.poly([[17, H - 6], [21, H - 12], [23, H - 6]], '#5fb04f');
+  }, { ay: H - 2 });
+}
+export function blanket() {
+  const W = 44, H = 26;
+  return mk(W, H, p => {
+    p.poly([[6, 4], [38, 4], [43, 22], [1, 22]], '#ffd0e0');
+    for (let y = 4; y < 22; y += 4) for (let x = 0; x < 44; x += 4) if (((x >> 2) + (y >> 2)) % 2) { const lx = 6 - (y - 4) * .29, rx = 38 + (y - 4) * .29; if (x >= lx && x + 4 <= rx) p.rect(x, y, 4, 4, '#ffffff'); }
+    p.ell(30, 10, 5, 3.4, '#e6b673'); p.rect(26, 7, 8, 2, '#c98a52'); p.disc(24, 12, 2.4, '#ef4f4f'); p.disc(19, 13, 2.4, '#ffb347');
+    p.ell(10, 10, 5, 3.4, '#ffffff'); p.ell(10, 10, 3, 2, '#ffd0e0');
+  }, { bevel: false, ay: H - 2 });
+}
+export function stump() { return mk(18, 16, p => { p.ell(9, 11, 7.5, 4.2, '#8a5230'); p.rect(2, 6, 14, 6, '#a8693f'); p.ell(9, 6, 7.5, 3.4, '#d9a066'); p.ell(9, 6, 4.4, 1.9, '#c98a52'); p.ell(9, 6, 1.6, .9, '#a8693f'); }, { ay: 14 }); }
+export function lanternGround() { return mk(10, 14, p => { p.rect(1, 3, 8, 9, '#ffd45a'); p.rect(2, 4, 3, 6, '#fff2a8'); p.rect(1, 3, 8, 1, '#3a3744'); p.rect(1, 11, 8, 1, '#3a3744'); p.rect(4, 3, 1, 9, '#3a3744'); p.poly([[0, 3], [5, 0], [10, 3]], '#2c2a35'); }, { bevel: false, ay: 12 }); }
+export function butterfly(c = '#ffd23f', open = true) {
+  return mk(7, 6, p => { if (open) { p.rect(0, 0, 3, 3, c); p.rect(4, 0, 3, 3, c); p.rect(1, 3, 2, 2, c); p.rect(4, 3, 2, 2, c); p.rect(3, 1, 1, 4, '#3a2418'); } else { p.rect(2, 0, 3, 5, c); p.rect(3, 0, 1, 5, '#3a2418'); } }, { bevel: false, outline: 0, ax: 3, ay: 3 });
 }

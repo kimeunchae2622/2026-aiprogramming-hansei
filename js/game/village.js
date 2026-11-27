@@ -51,6 +51,7 @@ const itemIconURL = id => iconURL(ITEMS[id].icon(), 3);
 
 /* ======================= 게임 상태 ======================= */
 let G = null; // 열려 있는 동안만 존재
+let opening = false, worldCache = null; // 마을 지도는 한 번만 만든다
 
 function defaults() {
   return { id: SAVE_ID, v: 1, name: '보호자', x: null, y: null, dir: 'down', companionId: null, bag: { flower: 0, berry: 0, stick: 0, gem: 0 }, gathered: {}, owned: { cushion: 0, pot: 0, bench: 0 }, placed: [], purse: 0, petPos: {}, seenHelp: false };
@@ -92,13 +93,19 @@ export function isVillageOpen() { return !!G; }
 export function __debug() { return G; } // 시험용: 실행 중인 게임 상태를 들여다본다 (화면에는 영향 없음)
 
 export async function openVillage(ctx) {
-  if (G) return;
+  if (G || opening) return;
   const pets = ctx.state.pets;
   if (!pets.length) { ctx.toast('먼저 반려동물을 등록해 주세요.'); return; }
+  opening = true;
+  const loading = h('div', { class: 'vg-loading' }, h('div', { class: 'vg-load-ico' }, '🌸'), h('p', {}, '별빛 꼬리 마을을 여는 중…'));
+  document.body.append(loading);
+  await new Promise(r => setTimeout(r, 40)); // 로딩 화면이 먼저 그려지도록
   let row; try { row = (await db.getAll('game')).find(r => r.id === SAVE_ID); } catch { row = null; }
-  const world = buildWorld();
+  let world;
+  try { world = worldCache || (worldCache = buildWorld()); } catch (e) { loading.remove(); opening = false; ctx.toast('마을을 열지 못했어요. 잠시 뒤 다시 시도해 주세요.'); return; }
   G = { ctx, world, save: sanitizeSave(row), dirty: false, t: 0, raf: 0, last: 0, S: 2, dpr: 1, vw: 0, vh: 0, cam: { x: 0, y: 0 }, keys: {}, joy: { dx: 0, dy: 0, id: null }, particles: [], pets: [], sel: 'basket', zoneId: null, hudT: 0, saveT: 0, actKey: '', act: null, act2: null, closing: false, tags: new Map(), rot: null };
-  setupPlayer(); setupPets(); buildUI(); resize();
+  setupPlayer(); setupPets(); setupFlies(); buildUI(); resize();
+  loading.remove(); opening = false;
   window.addEventListener('resize', resize); window.addEventListener('orientationchange', resize);
   document.addEventListener('keydown', onKey); document.addEventListener('keyup', onKey);
   document.addEventListener('visibilitychange', onVis);
@@ -109,7 +116,7 @@ export async function openVillage(ctx) {
   try { const el = document.documentElement; if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' }); } catch { /* 허용되지 않아도 계속 */ }
   try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch { /* iPhone 등은 회전 안내 */ }
   resize();
-  G.last = performance.now(); G.raf = requestAnimationFrame(frame);
+  G.last = 0; G.raf = requestAnimationFrame(frame);
   if (!G.save.seenHelp) { G.save.seenHelp = true; G.dirty = true; showHelp(); }
 }
 
@@ -257,7 +264,7 @@ function updatePets(dt) {
         if (pet.state === 'look') pet.dir = dirOf(dxp, dyp, pet.dir);
         if (pet.timer <= 0) {
           const r = Math.random(), cush = nearestFurn('cushion', pet.x, pet.y, 150);
-          if (cush && r < pet.trait.rest * 1.3) { pet.state = 'toRest'; pet.target = [(cush.tx + .5) * TS, (cush.ty + 1) * TS - 2]; }
+          if (cush && r < pet.trait.rest * 1.3) { pet.state = 'toRest'; pet.target = [(cush.tx + .5) * TS, (cush.ty + 1) * TS - 2]; pet.timer = 14; }
           else if (r < pet.trait.rest) { pet.state = 'rest'; pet.timer = 5 + Math.random() * 5; }
           else if (dist < 130 && r < pet.trait.rest + pet.trait.curious) { pet.state = 'approach'; pet.target = [pl.x + (Math.random() - .5) * 40, pl.y + 8 + Math.random() * 14]; pet.timer = 7; }
           else if (r < pet.trait.rest + pet.trait.curious + pet.trait.wander) { pet.state = 'wander'; const a = Math.random() * 6.28, d = 20 + Math.random() * 70; pet.target = [pet.x + Math.cos(a) * d, pet.y + Math.sin(a) * d]; pet.timer = 6; }
@@ -265,7 +272,7 @@ function updatePets(dt) {
         }
       } else if (pet.state === 'rest') { if (pet.timer <= 0) { pet.state = 'idle'; pet.timer = 1 + Math.random() * 2; } }
       else { // 목표로 걸어가기
-        const arrived = go(pet.target[0], pet.target[1], pet.speed, 3);
+        const arrived = pet.target ? go(pet.target[0], pet.target[1], pet.speed, 3) : true;
         if (arrived || pet.stuck > .8 || pet.timer <= 0) { pet.stuck = 0; if (arrived && pet.state === 'toRest') { pet.state = 'rest'; pet.timer = 8 + Math.random() * 6; } else { pet.state = 'idle'; pet.timer = .8 + Math.random() * 2.5; } }
       }
     }
@@ -277,6 +284,15 @@ const nearestFurn = (type, x, y, maxD) => {
   for (const f of G.save.placed) if (f.type === type) { const d = Math.hypot((f.tx + .5) * TS - x, (f.ty + 1) * TS - y); if (d < bd) { bd = d; best = f; } }
   return best;
 };
+
+/* ---- 나비: 꽃무더기 근처를 천천히 날아다닌다 ---- */
+const flyCache = {};
+const flySpr = (c, open) => flyCache[c + open] || (flyCache[c + open] = P.butterfly(c, open));
+function setupFlies() {
+  const rnd = rng(31), blooms = G.world.objects.filter(o => o.kind === 'bloom');
+  G.flies = [];
+  for (let i = 0; i < 16 && blooms.length; i++) { const b = blooms[Math.floor(rnd() * blooms.length)]; G.flies.push({ hx: b.x, hy: b.y - 12, ph: rnd() * 6.28, c: ['#ffd23f', '#ffffff', '#ff9bbd', '#9fd0ff'][i % 4] }); }
+}
 
 /* ---- 효과 입자 ---- */
 const heartSpr = (() => { let s; return () => s || (s = (() => { const p = new Pix(11, 10); p.disc(3.5, 3.5, 3, '#ff5a7a'); p.disc(7.5, 3.5, 3, '#ff5a7a'); p.poly([[.6, 4.6], [10.4, 4.6], [5.5, 9.6]], '#ff5a7a'); p.set(2, 2, '#ffd0da'); p.outline(.5); return p.done(5.5, 9); })()); })();
@@ -420,7 +436,8 @@ function render() {
   g.globalAlpha = 1;
   // 깊이 정렬
   const list = [];
-  for (const o of world.objects) { const sp = o.spr; if (o.x + sp.w < cx - 8 || o.x - sp.w > cx + vw + 8 || o.y - sp.h > cy + vh + 8 || o.y + 8 < cy) continue; list.push({ sy: o.sy, f: () => { const frame = o.frames ? o.frames[Math.floor(G.t * 2) % o.frames.length] : sp; drawSpr(g, frame, o.x, o.y); } }); }
+  for (const o of world.objects) { const sp = o.spr; if (o.x + sp.w < cx - 8 || o.x - sp.w > cx + vw + 8 || o.y - sp.h > cy + vh + 8 || o.y + 8 < cy) continue; const hide = (o.kind === 'tree' || o.kind === 'house' || o.kind === 'shop' || o.kind === 'mine' || o.kind === 'windmill') && G.player.y < o.y && G.player.y > o.y - sp.h * .9 && Math.abs(G.player.x - o.x) < sp.w * .46; // 뒤에 서면 반투명
+    list.push({ sy: o.sy, f: () => { const frame = o.frames ? o.frames[((Math.floor(G.t * 2) % o.frames.length) + o.frames.length) % o.frames.length] : sp; if (hide) g.globalAlpha = .5; drawSpr(g, frame, o.x, o.y); g.globalAlpha = 1; } }); }
   for (const s of world.spots) { if (s.x < cx - 20 || s.x > cx + vw + 20 || s.y < cy - 10 || s.y > cy + vh + 30) continue; const act = spotActive(s), spr = act ? s.sprites.full : s.sprites.empty; list.push({ sy: s.y, f: () => { drawSpr(g, spr, s.x, s.y); if (act) { const a = (Math.sin(G.t * 3 + s.x) + 1) / 2; if (a > .5) drawSpr(g, sparkSpr(), s.x + 8, s.y - 18 - a * 2); } } }); }
   for (const f of G.save.placed) { const def = FURN[f.type], spr = def.spr(), x = (f.tx + def.w / 2) * TS, y = (f.ty + 1) * TS - 2; list.push({ sy: y, f: () => drawSpr(g, f.type === 'bench' ? spr : spr, x, y) }); }
   const pl = G.player;
@@ -430,6 +447,8 @@ function render() {
   for (const it of list) it.f();
   // 놓기 미리보기
   if (FURN[G.sel] && G.save.owned[G.sel] > 0) { const gh = ghost(), def = FURN[G.sel]; g.globalAlpha = .6; drawSpr(g, def.spr(), (gh.tx + def.w / 2) * TS, (gh.ty + 1) * TS - 2); g.globalAlpha = .45; g.fillStyle = gh.ok ? '#6dff8a' : '#ff6a6a'; g.fillRect(gh.tx * TS, gh.ty * TS, def.w * TS, TS); g.globalAlpha = 1; }
+  // 나비
+  if (nightAmount() < .5) for (const f of G.flies) { const x = f.hx + Math.sin(G.t * .8 + f.ph) * 28, y = f.hy + Math.cos(G.t * 1.1 + f.ph) * 12 + Math.sin(G.t * 5 + f.ph) * 1.5; if (x < cx - 8 || x > cx + vw + 8 || y < cy - 8 || y > cy + vh + 8) continue; drawSpr(g, flySpr(f.c, Math.floor(G.t * 7 + f.ph * 3) % 2 === 0), x, y); }
   // 굴뚝 연기
   for (const sm of world.smoke) for (let i = 0; i < 5; i++) { const ph = ((G.t * .25 + i / 5) % 1), x = sm.x + Math.sin(ph * 6 + i) * 4 + ph * 8, y = sm.y - ph * 26; g.globalAlpha = (1 - ph) * .7; g.fillStyle = '#ffffff'; g.fillRect(Math.round(x - 2 - ph * 3), Math.round(y), 4 + ph * 6, 3 + ph * 3); }
   g.globalAlpha = 1;
@@ -472,12 +491,14 @@ function updateTags(cx, cy) {
 /* ======================= 프레임 루프 ======================= */
 function frame(ts) {
   if (!G || G.closing) return;
-  const dt = Math.min(.05, (ts - G.last) / 1000); G.last = ts;
+  if (!G.last) G.last = ts;
+  const dt = clamp((ts - G.last) / 1000, 0, .05); G.last = ts; // 시계가 거꾸로 가도 음수가 되지 않게
   if (!document.hidden && !G.portrait) {
+   try {
     G.t += dt;
     updatePlayer(dt); updatePets(dt); updateParticles(dt);
     // 카메라
-    const tx = clamp(G.player.x - G.vw / 2, 0, GW - G.vw), ty = clamp(G.player.y - G.vh / 2 + 6, 0, GH - G.vh);
+    const tx = clamp(G.player.x - G.vw / 2, 0, GW - G.vw), ty = clamp(G.player.y - G.vh * .58, 0, GH - G.vh);
     const k = 1 - Math.exp(-9 * dt); G.cam.x += (tx - G.cam.x) * k; G.cam.y += (ty - G.cam.y) * k;
     // 구역 이름
     const z = zoneAt(G.player.x, G.player.y);
@@ -488,6 +509,10 @@ function frame(ts) {
     G.hudT -= dt; if (G.hudT <= 0) { G.hudT = .3; paintHud(); }
     G.saveT += dt; if (G.saveT > 6) { G.saveT = 0; if (G.dirty || G.player.moving) persist(); }
     render();
+   } catch (e) { // 한 프레임의 오류가 게임 전체를 멈추지 않도록
+    G.errs = (G.errs || 0) + 1; if (G.errs === 1) console.error('마을 오류:', e);
+    if (G.errs > 120) { toast('문제가 생겨 마을을 닫아요'); closeVillage(); return; }
+   }
   }
   G.raf = requestAnimationFrame(frame);
 }
@@ -519,8 +544,8 @@ function buildUI() {
   G.heartBar = h('i', {}); G.starBar = h('i', {});
   const prof = h('div', { class: 'vg-panel vg-prof' }, h('div', { class: 'vg-face-wrap' }, faceImg),
     h('div', { class: 'vg-prof-text' }, G.nameEl, G.lvEl,
-      h('div', { class: 'vg-bar heart' }, h('img', { src: pxIcon('heart'), alt: '' }), h('span', {}, G.heartBar)),
-      h('div', { class: 'vg-bar star' }, h('b', {}, '★'), h('span', {}, G.starBar))));
+      h('div', { class: 'vg-bar heart', title: '친밀도' }, h('img', { src: pxIcon('heart'), alt: '친밀도' }), h('span', {}, G.heartBar)),
+      h('div', { class: 'vg-bar star', title: '오늘 채집' }, h('b', {}, '★'), h('span', {}, G.starBar))));
   G.coinEl = h('span', {}, '0');
   const coin = h('div', { class: 'vg-panel vg-coin' }, h('img', { src: pxIcon('coin'), alt: '' }), G.coinEl);
   const bagBtn = h('button', { class: 'vg-panel vg-round', 'aria-label': '가방', onclick: () => openBag() }, h('img', { src: pxIcon('bag'), alt: '' }));
@@ -587,8 +612,9 @@ function paintHud() {
   const fp = focusPet(), ch = chars().find(c => c.id === fp.id);
   const xp = ch ? (ch.xp || 0) : 0, lv = levelOf(xp);
   G.lvEl.textContent = ch ? `${fp.name} · 친밀도 Lv.${lv}` : `${fp.name}`;
-  G.heartBar.style.width = (ch ? currentStats(ch).happy : 60) + '%';
-  G.starBar.style.width = ch ? Math.round(((xp - levelFloor(lv)) / (levelFloor(lv + 1) - levelFloor(lv))) * 100) + '%' : '0%';
+  G.heartBar.style.width = (ch ? Math.round(((xp - levelFloor(lv)) / (levelFloor(lv + 1) - levelFloor(lv))) * 100) : 0) + '%'; // 친밀도: 시간이 지나도 줄지 않는다
+  const done = G.world.spots.filter(s => !spotActive(s)).length;
+  G.starBar.style.width = Math.round(done / G.world.spots.length * 100) + '%'; // 오늘 채집 진행
   G.coinEl.textContent = wallet().toLocaleString('ko-KR');
   // 핫바
   const slots = [['basket', '바구니', null, null], ...Object.keys(ITEMS).map(k => [k, ITEMS[k].name, G.save.bag[k], itemIconURL(k)]), ...Object.keys(FURN).map(k => [k, FURN[k].name, G.save.owned[k], furnIcon(k)])];
