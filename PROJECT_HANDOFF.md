@@ -1,5 +1,7 @@
 # PROJECT HANDOFF — 반려동물 추억 저장소 + 별빛 꼬리 마을
 
+> **최신 변경(2차 갱신, 2026-11-27)**: ①화면 떨림 수정(카메라 정확 추적 + 장치 픽셀 정렬, `village.js render/frame`) ②하단 '돌보기'는 구형 화면 없이 마을 직행(`app.js` 탭 onclick) ③최초 생성·외모 수정 화면 `js/game/creator.js`, 외형은 `game.look`(주인공)·`game.petLooks[petId]`(아이별)에 저장, `setup` 플래그 ④반려동물 스프라이트는 `petFrame(look, dir, pose)`로 변경(옵션표 `PET_OPTS`) ⑤**최상위 철학**: 배고픔·청결·방치 패널티·의무 퀘스트를 절대 추가하지 않는다(접속 안 해도 아무것도 줄지 않음). 미완료: 그래픽 밀도 개선, 비 오는 날 처마·낮잠·간식, 실제 폰 시험. 자세한 내용은 `docs/DEVELOPMENT_REPORT.md` 2차 갱신.
+
 > 마지막 갱신: 2026-11-27 (1차 마을 개발 직후). 다음 개발자(사람 또는 AI)가 이 파일과 저장소만 보고 이어서 작업할 수 있게 쓴 문서입니다.
 > 확인 수준: "코드로 확인" = 저장소 코드를 직접 읽거나 실행해서 확인, "추정" = 확인하지 못함.
 
@@ -34,7 +36,7 @@
 
 설계 상세는 `docs/GAME_DESIGN.md`, 그래픽 출처는 `docs/ASSET_SOURCES.md`, 시험은 `docs/TEST_RESULTS.md`, 결과 보고는 `docs/DEVELOPMENT_REPORT.md`.
 
-- 진입: 돌보기 탭 맨 위 **별빛 꼬리 마을 들어가기** 버튼 → `careCtx.openVillage()`(`js/app.js`) → `openVillage()`(`js/game/village.js`).
+- 진입: 하단 **돌보기** 탭 → `careCtx.openVillage()`(`js/app.js`) → `openVillage()`(`js/game/village.js`).
 - 직접 만든 Canvas 2D 엔진(Phaser 미사용), 모든 그림은 코드가 그리는 원본 픽셀 아트(외부 에셋 없음).
 - 구현됨: 가로 전체 화면(세로면 회전 안내), 조이스틱/키보드 이동, 충돌·가림 순서, 카메라, 반려동물 여러 마리의 자율 행동·쓰다듬기·산책 동행·방석에서 쉬기, 채집 4종(매일 오전 5시 KST 갱신)·가방, 상점(가구 사기·채집물 팔기), 정원 가구 놓기·치우기, 낮밤·벚꽃잎·나비·물 반짝임, 주인공 이름·외형(머리·원피스·피부) 선택, 저장·백업 포함.
 - **준비 중 표시만 있음**: 광산(`mine`), 낚시터(`pier`), 농장(`farm`) — `js/game/world.js`의 `world.interacts`와 `village.js`의 `useInteract()`에서 연결하면 됩니다. 지도를 다시 만들 필요 없음.
