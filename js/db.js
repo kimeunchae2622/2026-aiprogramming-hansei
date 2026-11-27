@@ -1,9 +1,9 @@
 // IndexedDB 저장소: 모든 기록은 사용자 폰(브라우저) 안에만 저장된다.
 const DB_NAME = 'pet-memories';
-const DB_VERSION = 3;
-export const STORES = ['pets', 'posts', 'events', 'characters', 'meta'];
+const DB_VERSION = 4;
+export const STORES = ['pets', 'posts', 'events', 'characters', 'game', 'meta'];
 // 백업에 포함할 저장소 (기능이 늘어나면 여기에 추가)
-export const BACKUP_STORES = ['pets', 'posts', 'events', 'characters'];
+export const BACKUP_STORES = ['pets', 'posts', 'events', 'characters', 'game'];
 
 let dbPromise;
 function open() {
@@ -20,6 +20,7 @@ function open() {
       }
       if (e.oldVersion < 2) db.createObjectStore('events', { keyPath: 'id' });
       if (e.oldVersion < 3) db.createObjectStore('characters', { keyPath: 'id' }); // id = 반려동물 id
+      if (e.oldVersion < 4) db.createObjectStore('game', { keyPath: 'id' });       // 마을 게임 저장 (id = 'village')
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

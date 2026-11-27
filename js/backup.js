@@ -37,7 +37,7 @@ export async function createBackupFile() {
     data[name] = await Promise.all((await getAll(name)).map(serializeRow));
   }
   const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  return { blob, name: backupFileName(), counts: { pets: data.pets.length, posts: data.posts.length, events: data.events.length, characters: data.characters.length } };
+  return { blob, name: backupFileName(), counts: { pets: data.pets.length, posts: data.posts.length, events: data.events.length, characters: data.characters.length, game: data.game.length } };
 }
 
 export async function downloadBackup() {
@@ -95,5 +95,14 @@ export async function parseBackup(text) {
     if (!petIds.has(c.id)) continue;
     characters.push(c);
   }
-  return { pets, posts, events, characters };
+  // 마을 게임 저장(위치·가방·채집·정원). 예전 백업에는 없을 수 있다.
+  const rawGame = data.game === undefined ? [] : data.game;
+  if (!Array.isArray(rawGame)) throw new Error('bad-file');
+  const game = [];
+  for (const g of rawGame) {
+    if (!g || typeof g.id !== 'string' || typeof g !== 'object') throw new Error('bad-file');
+    if (g.id === 'village' && (typeof g.bag !== 'object' || g.bag === null)) throw new Error('bad-file');
+    game.push(g);
+  }
+  return { pets, posts, events, characters, game };
 }

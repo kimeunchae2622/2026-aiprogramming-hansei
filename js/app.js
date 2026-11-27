@@ -3,6 +3,7 @@ import { h, uid, compressImage, formatTime, ymd, parseYmd, isLeap, formatClock, 
 import { downloadBackup, parseBackup } from './backup.js';
 import { renderMapTab, destroyMap } from './map.js';
 import { renderCareTab, destroyCare, grantPostCoins } from './care.js';
+import { openVillage } from './game/village.js';
 import { iconEl as ic } from './icons.js';
 import { getSettings, setSettings, STYLES, MODES, ACCENTS } from './theme.js';
 
@@ -714,7 +715,11 @@ function renderMore() {
 }
 
 /* ---------- 전체 그리기 ---------- */
-const careCtx = { state, toast, openSheet, confirmBox, avatar, render: () => render(), reload: () => reload() };
+const careCtx = {
+  state, toast, openSheet, confirmBox, avatar, render: () => render(), reload: () => reload(),
+  // 별빛 꼬리 마을(가로 전체 화면 게임). 나오면 코인·친밀도가 바뀌었을 수 있어 다시 불러온다
+  openVillage: () => openVillage({ state, toast, confirmBox, render: () => render(), onExit: () => reload() }),
+};
 
 function render() {
   urls.forEach(u => URL.revokeObjectURL(u));

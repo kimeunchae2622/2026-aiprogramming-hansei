@@ -54,8 +54,8 @@ function moodOf(s) {
   return 'normal';
 }
 
-const levelOf = xp => 1 + Math.floor(Math.sqrt(xp / 12));
-const levelFloor = lv => 12 * (lv - 1) ** 2;
+export const levelOf = xp => 1 + Math.floor(Math.sqrt(xp / 12));
+export const levelFloor = lv => 12 * (lv - 1) ** 2;
 
 // 행동: 수치 변화(d), 말풍선, 코인·경험치. 안 되는 상황이면 ok:false 로 이유만 알려 준다.
 const ACTIONS = {
@@ -154,6 +154,10 @@ export function renderCareTab(ctx) {
   state.carePet = pet.id;
   const rawChar = state.characters.find(c => c.id === pet.id);
 
+  const villageEntry = h('button', { class: 'village-entry', type: 'button', onclick: () => ctx.openVillage && ctx.openVillage() },
+    h('span', { class: 've-art', 'aria-hidden': 'true' }, '🏡'),
+    h('span', { class: 've-t' }, h('strong', {}, '별빛 꼬리 마을'), h('span', {}, '우리 아이들과 함께 산책하고 채집하고 정원을 꾸며요')),
+    h('span', { class: 've-go' }, '들어가기'));
   const chips = state.pets.length > 1 && h('div', { class: 'filter', role: 'tablist', 'aria-label': '아이 고르기' },
     state.pets.map(p => h('button', {
       class: 'chip' + (p.id === pet.id ? ' active' : ''), role: 'tab',
@@ -162,7 +166,7 @@ export function renderCareTab(ctx) {
 
   if (!rawChar) {
     const defKind = pet.species === 'cat' ? 'cat' : 'dog';
-    return h('div', { class: 'page care' }, chips,
+    return h('div', { class: 'page care' }, villageEntry, chips,
       h('section', { class: 'card' },
         h('h2', {}, `${pet.name}의 캐릭터를 만들어요`),
         h('p', { class: 'muted' }, '우리 아이와 닮은 모습을 골라 보세요. 나만의 아늑한 집에서 함께 지낼 수 있어요. 모습은 언제든 바꿀 수 있어요.'),
@@ -436,7 +440,7 @@ export function renderCareTab(ctx) {
   }
 
   refresh();
-  return h('div', { class: 'page care' }, chips,
+  return h('div', { class: 'page care' }, villageEntry, chips,
     h('section', { class: 'card home-card' }, roomEl, nameRow, bars, actionRow, tiles,
       othersWithoutChar.length ? h('p', { class: 'muted neighbor-tip' }, `${othersWithoutChar.map(p => p.name).join(', ')}의 캐릭터도 만들면 이웃으로 놀러 와요. 위에서 아이를 눌러 만들 수 있어요.`) : (neighborList.length ? h('p', { class: 'muted neighbor-tip' }, '이웃 아이를 누르면 그 아이의 집에 놀러 갈 수 있어요.') : null)));
 }
