@@ -68,7 +68,7 @@ function sanitizeSave(raw) {
   s.petLooks = s.petLooks && typeof s.petLooks === 'object' ? s.petLooks : {};
   s.gathered = s.gathered && typeof s.gathered === 'object' ? s.gathered : {};
   s.petPos = s.petPos && typeof s.petPos === 'object' ? s.petPos : {};
-  s.purse = n(s.purse);
+  s.purse = n(s.purse); s.lastVisit = Number.isFinite(s.lastVisit) ? s.lastVisit : 0;
   return s;
 }
 
@@ -127,6 +127,11 @@ export async function openVillage(ctx) {
   window.addEventListener('popstate', popHandler);
   resize();
   G.last = 0; G.raf = requestAnimationFrame(frame);
+  // 오랜만에 오면 반려동물이 반갑게 다가온다 (배고픔·호감도 하락 같은 벌은 전혀 없음)
+  if (G.save.lastVisit && Date.now() - G.save.lastVisit > 6 * 3600000) {
+    G.pets.forEach((q, i) => { q.state = 'approach'; q.target = [G.player.x + (i - (G.pets.length - 1) / 2) * 22, G.player.y + 14]; q.timer = 9; q.speed = 34; });
+    setTimeout(() => { if (G) { toast('오랜만이에요! 아이들이 반갑게 달려와요 🐾'); G.pets.forEach(q => burst('heart', q.x, q.y - 18, 2)); } }, 1200);
+  }
   if (!G.save.setup) openCreator(false); else if (!G.save.seenHelp) { G.save.seenHelp = true; G.dirty = true; showHelp(); }
 }
 
@@ -154,6 +159,7 @@ async function closeNow() {
 
 async function persist() {
   if (!G) return;
+  G.save.lastVisit = Date.now();
   G.save.x = Math.round(G.player.x); G.save.y = Math.round(G.player.y); G.save.dir = G.player.dir;
   G.save.petPos = Object.fromEntries(G.pets.map(p => [p.id, [Math.round(p.x), Math.round(p.y)]]));
   try { await db.put('game', { ...G.save }); G.dirty = false; } catch { /* 저장 공간 부족 등: 다음에 다시 시도 */ }
@@ -372,8 +378,7 @@ async function petPet(pet) {
   pet.lastPet = now;
   const ch = chars().find(c => c.id === pet.id);
   if (ch) { // 기존 친밀도(경험치)와 기분을 올린다
-    const s = currentStats(ch, now);
-    Object.assign(ch, { full: s.full, happy: Math.min(100, s.happy + 3), clean: s.clean, at: now, xp: (ch.xp || 0) + 1 });
+    ch.xp = (ch.xp || 0) + 1; // 친밀도(경험치)만 올린다. 시간이 지나도 줄어드는 수치는 마을에 없다
     try { await db.put('characters', { ...ch }); } catch { /* 저장 실패는 무시 */ }
     floatText('친밀도 +1', pet.x, pet.y - 30);
   }
